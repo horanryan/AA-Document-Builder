@@ -91,7 +91,14 @@
 
         <section class="card signature-page-note">
           <h2>Signature Page</h2>
-          <p class="muted">Sign in person here, or leave this blank to keep a fillable customer signature field in the PDF.</p>
+          <p class="muted">Sign in person, create a typed signature, or leave this blank to keep a fillable customer signature field in the PDF.</p>
+          <div class="typed-signature-row">
+            <label class="field">
+              <span>Typed Signature Name</span>
+              <input id="typedSignatureName" type="text" placeholder="Type customer name">
+            </label>
+            <button id="useTypedSignatureBtn" class="secondary" type="button">Use Typed Signature</button>
+          </div>
           <div class="signature-area">
             <canvas id="signatureCanvas" aria-label="Customer signature pad"></canvas>
           </div>

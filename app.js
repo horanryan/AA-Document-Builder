@@ -131,7 +131,7 @@ const REQUIRED_ELEMENT_IDS = [
   'installBtn', 'newJobBtn', 'saveBtn', 'jobList', 'storageStatus', 'currentJobTitle', 'dirtyPill',
   'jobInfoFields', 'inspectionItems', 'inHouseItems', 'summaryNotes', 'addPhotosBtn', 'photoInput', 'photoGrid',
   'refreshPhotosBtn', 'clearPhotosBtn', 'signedPdfBtn', 'outputStatus',
-  'signatureCanvas', 'clearSignatureBtn', 'signatureStatus',
+  'typedSignatureName', 'useTypedSignatureBtn', 'signatureCanvas', 'clearSignatureBtn', 'signatureStatus',
   'bottomSaveBtn', 'bottomSignedPdfBtn', 'bottomOutputStatus',
   'checklistForm'
 ];
@@ -144,6 +144,7 @@ const photoUrls = new Map();
 let signatureDrawing = false;
 let signatureHasInk = false;
 let signatureImageData = '';
+let signatureTypedName = '';
 
 /* Initialize app when DOM is ready */
 window.addEventListener('DOMContentLoaded', async () => {
@@ -342,6 +343,14 @@ function bindSignaturePad() {
 
   els.signatureCanvas.addEventListener('pointerdown', event => {
     event.preventDefault();
+    if (signatureTypedName) {
+      signatureTypedName = '';
+      signatureHasInk = false;
+      signatureImageData = '';
+      els.typedSignatureName.value = '';
+      clearSignatureCanvas();
+      updateSignatureStatus();
+    }
     signatureDrawing = true;
     els.signatureCanvas.setPointerCapture?.(event.pointerId);
     const point = signaturePoint(event);
@@ -358,6 +367,8 @@ function bindSignaturePad() {
     ctx.lineTo(point.x, point.y);
     ctx.stroke();
     signatureHasInk = true;
+    signatureTypedName = '';
+    els.typedSignatureName.value = '';
     updateSignatureStatus();
   });
 
@@ -376,9 +387,38 @@ function bindSignaturePad() {
     });
   });
 
+  els.useTypedSignatureBtn.addEventListener('click', () => {
+    const name = els.typedSignatureName.value.trim() || document.getElementById('field_customerName')?.value.trim() || '';
+    if (!name) {
+      setStatus('Enter a typed signature name first.');
+      els.typedSignatureName.focus();
+      return;
+    }
+
+    els.typedSignatureName.value = name;
+    renderTypedSignature(name);
+    signatureTypedName = name;
+    signatureHasInk = true;
+    signatureImageData = els.signatureCanvas.toDataURL('image/png');
+    updateSignatureStatus();
+    markDirty(true);
+  });
+
+  els.typedSignatureName.addEventListener('input', () => {
+    if (signatureTypedName) {
+      signatureTypedName = '';
+      signatureHasInk = false;
+      signatureImageData = '';
+      clearSignatureCanvas();
+      updateSignatureStatus();
+    }
+  });
+
   els.clearSignatureBtn.addEventListener('click', () => {
     signatureHasInk = false;
     signatureImageData = '';
+    signatureTypedName = '';
+    els.typedSignatureName.value = '';
     clearSignatureCanvas();
     updateSignatureStatus();
     markDirty(true);
@@ -429,6 +469,25 @@ function clearSignatureCanvas() {
   signatureContext().clearRect(0, 0, rect.width, rect.height);
 }
 
+function renderTypedSignature(name) {
+  clearSignatureCanvas();
+  const canvas = els.signatureCanvas;
+  const rect = canvas.getBoundingClientRect();
+  const ctx = signatureContext();
+  const maxWidth = Math.max(120, rect.width - 42);
+  let fontSize = Math.min(58, Math.max(34, rect.width / 9));
+
+  do {
+    ctx.font = `${fontSize}px "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive`;
+    fontSize -= 2;
+  } while (ctx.measureText(name).width > maxWidth && fontSize > 24);
+
+  ctx.fillStyle = '#201727';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, rect.width / 2, rect.height / 2 + 8, maxWidth);
+}
+
 async function drawSignatureImage(dataUrl) {
   try {
     const img = await loadImage(dataUrl);
@@ -443,9 +502,13 @@ async function drawSignatureImage(dataUrl) {
 }
 
 function updateSignatureStatus() {
-  els.signatureStatus.textContent = signatureHasInk
-    ? 'Captured signature will be embedded in the PDF.'
-    : 'No captured signature. PDF will include a signature field.';
+  if (signatureTypedName) {
+    els.signatureStatus.textContent = 'Typed signature will be embedded in the PDF.';
+  } else if (signatureHasInk) {
+    els.signatureStatus.textContent = 'Captured signature will be embedded in the PDF.';
+  } else {
+    els.signatureStatus.textContent = 'No captured signature. PDF will include a signature field.';
+  }
 }
 
 /* Track unsaved changes and update status indicators */
@@ -479,10 +542,11 @@ function collectJobFromForm() {
 
 function collectSignatureFields(job) {
   if (signatureHasInk && signatureImageData) {
-    job.signatureMode = 'captured';
-    job.signatureName = job.fields?.customerName || '';
+    job.signatureMode = signatureTypedName ? 'typed' : 'captured';
+    job.signatureName = signatureTypedName || job.fields?.customerName || '';
     job.signatureDate = job.signatureDate || new Date().toISOString().slice(0, 10);
     job.signatureImage = signatureImageData;
+    job.signatureTypedName = signatureTypedName || '';
     delete job.remote;
     return;
   }
@@ -491,6 +555,7 @@ function collectSignatureFields(job) {
   delete job.signatureMode;
   delete job.signatureName;
   delete job.signatureImage;
+  delete job.signatureTypedName;
   delete job.remote;
 }
 
@@ -518,6 +583,8 @@ function hydrateForm(job) {
   hydrateItemGroup('inHouse', IN_HOUSE_ITEMS, job.inHouse || {});
   els.summaryNotes.value = job.summaryNotes || '';
   signatureImageData = job.signatureImage || '';
+  signatureTypedName = job.signatureMode === 'typed' ? (job.signatureTypedName || job.signatureName || '') : '';
+  els.typedSignatureName.value = signatureTypedName;
   signatureHasInk = Boolean(signatureImageData);
   resizeSignatureCanvas();
   updateSignatureStatus();
