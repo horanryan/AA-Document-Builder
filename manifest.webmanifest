@@ -1,6 +1,6 @@
 {
   "name": "Absolute Aluminum Document Builder",
-  "short_name": "DocBuilder",
+  "short_name": "AA Docs",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f6f8ef",
