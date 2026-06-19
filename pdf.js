@@ -10,6 +10,8 @@ const PDF_COLORS = {
   lime: [0.784, 0.906, 0.157],
   teal: [0, 0.557, 0.690],
   paleLime: [0.984, 1, 0.941],
+  lightGray: [0.82, 0.84, 0.86],
+  gray: [0.38, 0.4, 0.43],
   white: [1, 1, 1]
 };
 async function generatePacket() {
@@ -40,16 +42,13 @@ function packetFilename(job) {
   return `${customer}_${jobNum}_${doc.filenameLabel}.pdf`;
 }
 
-function packetSubtitle(job) {
-  return 'Pre-signature packet';
-}
-
 /* Build the PDF document structure for the selected packet */
 async function buildDocumentPacketPdf(job, photos) {
   job = normalizeJob(job);
   const doc = { pages: [], logo: await loadPdfLogo() };
   await addDocumentPages(doc, job);
   await addPhotoPages(doc, job, photos);
+  doc.pages.forEach((page, index) => addPageNumber(page, index + 1, doc.pages.length));
   return buildPdf(doc);
 }
 
@@ -57,7 +56,7 @@ async function buildDocumentPacketPdf(job, photos) {
 async function addDocumentPages(doc, job) {
   const definition = getDocumentDefinition(job.documentType);
   let page = newPdfPage(doc.logo);
-  let y = startPdfPage(page, job, packetSubtitle(job));
+  let y = startPdfPage(page, job);
   const jobFields = filledJobFields(job, definition);
 
   if (jobFields.length) {
@@ -75,19 +74,14 @@ async function addDocumentPages(doc, job) {
   }
 
   if (hasPdfValue(job.summaryNotes)) {
-    ({ page, y } = ensurePageSpace(doc, page, job, y + 8, 110, 'Summary'));
+    ({ page, y } = ensurePageSpace(doc, page, job, y + 4, 78, 'Summary'));
     y = sectionBar(page, 'SUMMARY NOTES', y);
     y = addSummaryBlock(page, job, y);
   }
 
-  addFooter(page, job);
+  ({ page, y } = ensurePageSpace(doc, page, job, y + 4, 104, 'Signature'));
+  await addSignatureBlock(page, job, y + 8);
   doc.pages.push(page);
-
-  const sigPage = newPdfPage(doc.logo);
-  startPdfPage(sigPage, job, 'Signature page');
-  await addSignatureBlock(sigPage, job, 156);
-  addFooter(sigPage, job);
-  doc.pages.push(sigPage);
 }
 
 /* Create an empty PDF page container */
@@ -104,46 +98,42 @@ async function loadPdfLogo() {
 }
 
 /* Add the document header to each PDF page */
-function startPdfPage(page, job, subtitle = 'Pre-signature packet') {
-  addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job, 28, subtitle);
-  return 104;
+function startPdfPage(page, job) {
+  addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job, 28);
+  return 150;
 }
 
-/* Draw the PDF title header and metadata */
-function addHeader(page, title, job, yTop, subtitle = '') {
-  rect(page, 32, yTop - 8, PAGE_W - 64, 68, PDF_COLORS.white);
-  rectStroke(page, 32, yTop - 8, PAGE_W - 64, 68, PDF_COLORS.plum);
-  rect(page, 32, yTop + 56, PAGE_W - 64, 4, PDF_COLORS.lime);
-  rect(page, 32, yTop + 60, PAGE_W - 64, 3, PDF_COLORS.orange);
-  if (page.logo) imageOnPage(page, page.logo, 42, yTop + 1, 112, 48);
-  text(page, title, page.logo ? 170 : 44, yTop + 15, 17, 'F2', PDF_COLORS.plum);
-  text(page, subtitle || 'Pre-signature packet', page.logo ? 170 : 44, yTop + 39, 9, 'F1', PDF_COLORS.teal);
-  if (job.fields?.jobNumberPhase) textRight(page, job.fields.jobNumberPhase, PAGE_W - 44, yTop + 17, 10, 'F2', PDF_COLORS.plum);
-  textRight(page, new Date().toLocaleDateString(), PAGE_W - 44, yTop + 39, 9, 'F1', PDF_COLORS.teal);
+/* Draw the logo-led title used by the source PreCon and Zero Defect documents. */
+function addHeader(page, title, job, yTop) {
+  if (page.logo) {
+    const logoFit = fitRect(page.logo.width, page.logo.height, 170, 94);
+    imageOnPage(page, page.logo, MARGIN, yTop + 6, logoFit.w, logoFit.h);
+  }
+  const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
+  const titleX = 344;
+  text(page, lines[0], titleX, yTop + 38, 23, 'F2', PDF_COLORS.plum);
+  text(page, lines[1], titleX + (lines[1] === 'REPORT' ? 40 : 42), yTop + 67, 23, 'F2', PDF_COLORS.plum);
 }
 
 function sectionBar(page, title, y) {
-  rect(page, MARGIN, y, PAGE_W - MARGIN * 2, 18, PDF_COLORS.plum);
-  text(page, title, MARGIN + 8, y + 12, 9, 'F2', PDF_COLORS.white);
-  return y + 24;
+  const displayTitle = title.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+  text(page, displayTitle, MARGIN, y + 11, 11, 'F2', PDF_COLORS.plum);
+  line(page, MARGIN, y + 14, PAGE_W - MARGIN, y + 14, PDF_COLORS.gray);
+  return y + 16;
 }
 
 /* Ensure enough space remains on the current PDF page or create a new page */
 function ensurePageSpace(doc, page, job, y, needed, subtitle) {
-  if (y + needed <= 736) return { page, y, newPage: false };
-  addFooter(page, job);
+  if (y + needed <= 752) return { page, y, newPage: false };
   doc.pages.push(page);
   const nextPage = newPdfPage(doc.logo);
-  const nextY = startPdfPage(nextPage, job, subtitle);
+  const nextY = 44;
   return { page: nextPage, y: nextY, newPage: true };
 }
 
-/* Draw the footer on a PDF page */
-function addFooter(page, job = currentJob) {
-  const definition = getDocumentDefinition(job?.documentType);
-  line(page, MARGIN, 758, PAGE_W - MARGIN, 758, PDF_COLORS.teal);
-  text(page, definition.title, MARGIN, 774, 7, 'F1', PDF_COLORS.teal);
-  textRight(page, definition.footerNote, PAGE_W - MARGIN, 774, 7, 'F1', PDF_COLORS.teal);
+/* Match the references' unobtrusive page count in the upper-right corner. */
+function addPageNumber(page, pageNumber, pageCount) {
+  textRight(page, `Page ${pageNumber} of ${pageCount}`, PAGE_W - 24, 28, 8, 'F1', PDF_COLORS.gray);
 }
 
 /* Helpers for filtering fields and items that should be printed */
@@ -168,19 +158,20 @@ function selectedWording(item, row) {
   return (getDocumentDefinition(currentJob?.documentType).displayedWording?.[item.id] || []).filter(([sel]) => sel === selection);
 }
 
-/* Render job fields into the PDF in two columns */
+/* Render compact label/value rows inside one outlined section. */
 function addJobInfo(page, job, y, fields = filledJobFields(job)) {
-  const colW = (PAGE_W - MARGIN * 2) / 2;
+  const rowH = 18;
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, fields.length * rowH, PDF_COLORS.gray);
   fields.forEach((field, idx) => {
-    const x = idx % 2 === 0 ? MARGIN : MARGIN + colW;
-    if (idx > 0 && idx % 2 === 0) y += 28;
-    labelValue(page, field.label, job.fields?.[field.id] || '', x, y, colW);
+    const rowY = y + idx * rowH;
+    text(page, field.label, MARGIN + 6, rowY + 12, 7.5, 'F2');
+    textRight(page, job.fields?.[field.id] || '', PAGE_W - MARGIN - 6, rowY + 12, 9, 'F1');
   });
-  return y + 34;
+  return y + fields.length * rowH + 4;
 }
 
 function labelValue(page, label, value, x, y, width) {
-  rectStroke(page, x, y, width, 24, PDF_COLORS.teal);
+  rectStroke(page, x, y, width, 24, PDF_COLORS.lightGray);
   rect(page, x, y, width, 8, PDF_COLORS.paleLime);
   text(page, label, x + 5, y + 6, 6.5, 'F2', PDF_COLORS.plum);
   wrappedText(page, value || ' ', x + 5, y + 19, width - 10, 8, 9, 'F1', 1);
@@ -191,8 +182,8 @@ function itemDisplayValue(item, row) {
 }
 
 function itemRowHeight(item, row) {
-  const messageLines = wrapText(itemPdfMessage(item, row), 112).length;
-  return Math.max(34, 22 + messageLines * 9);
+  const message = itemPdfMessage(item, row);
+  return message.length > 64 ? Math.max(30, 17 + wrapText(message, 98).length * 9) : 20;
 }
 
 /* Add a table of checklist items to the PDF */
@@ -209,14 +200,18 @@ function addItemTable(doc, page, job, items, values, y, continuationTitle) {
     addItemRow(page, item, row, y, h);
     y += h;
   }
-  return { page, y: y + 6 };
+  return { page, y: y + 4 };
 }
 
 function addItemRow(page, item, row, y, h) {
-  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.teal);
-  rect(page, MARGIN, y, PAGE_W - MARGIN * 2, 14, PDF_COLORS.paleLime);
-  text(page, item.label, MARGIN + 8, y + 10, 9.5, 'F2', PDF_COLORS.plum);
-  wrappedText(page, itemPdfMessage(item, row), MARGIN + 8, y + 25, PAGE_W - MARGIN * 2 - 16, 8.2, 9.2, 'F1');
+  const message = itemPdfMessage(item, row);
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.lightGray);
+  text(page, item.label, MARGIN + 6, y + 12, 7.5, 'F2');
+  if (message.length > 64) {
+    wrappedText(page, message, MARGIN + 24, y + 25, PAGE_W - MARGIN * 2 - 30, 8.5, 9, 'F1');
+  } else {
+    textRight(page, message, PAGE_W - MARGIN - 6, y + 12, 9, 'F1');
+  }
 }
 
 function itemPdfMessage(item, row) {
@@ -227,52 +222,47 @@ function itemPdfMessage(item, row) {
 
 /* Add summary notes block to the PDF */
 function addSummaryBlock(page, job, y) {
-  const h = Math.min(128, Math.max(54, wrapText(job.summaryNotes || ' ', 116).length * 9 + 18));
-  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.teal);
-  wrappedText(page, job.summaryNotes || ' ', MARGIN + 8, y + 16, PAGE_W - MARGIN * 2 - 16, 8, 9.5, 'F1');
+  const h = Math.min(110, Math.max(44, wrapText(job.summaryNotes || ' ', 106).length * 9 + 24));
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.gray);
+  text(page, 'Notes', MARGIN + 6, y + 12, 7.5, 'F2');
+  wrappedText(page, job.summaryNotes || ' ', MARGIN + 24, y + 27, PAGE_W - MARGIN * 2 - 30, 8.5, 9.5, 'F1');
   return y + h + 6;
 }
 
 /* Add the signature section to the PDF */
 async function addSignatureBlock(page, job, y) {
-  const definition = getDocumentDefinition(job.documentType);
-  y = sectionBar(page, 'CUSTOMER ACKNOWLEDGMENT', y);
-  wrappedText(page, definition.signatureText, MARGIN, y + 6, PAGE_W - MARGIN * 2, 10, 13, 'F1');
-  y += 86;
-  line(page, MARGIN, y, MARGIN + 300, y, PDF_COLORS.teal);
-  text(page, '{{bsr}}', MARGIN + 4, y - 10, 12, 'F1', PDF_COLORS.white);
-  text(page, 'Customer Signature', MARGIN, y + 16, 8, 'F2', PDF_COLORS.plum);
-  labelValue(page, 'Customer Printed Name', job.fields?.customerName || '', MARGIN, y + 42, 250);
-  labelValue(page, 'Date', '', 330, y + 42, 160);
-  text(page, '{{bdr}}', 345, y + 61, 8, 'F1', PDF_COLORS.white);
+  const lineW = 310;
+  line(page, MARGIN, y + 46, MARGIN + lineW, y + 46, PDF_COLORS.gray);
+  text(page, '{{bsr}}', MARGIN + 6, y + 36, 12, 'F1', PDF_COLORS.white);
+  text(page, job.fields?.customerName || 'Customer', MARGIN + 10, y + 58, 7.5, 'F2', PDF_COLORS.plum);
+  line(page, MARGIN, y + 78, MARGIN + lineW, y + 78, PDF_COLORS.gray);
+  text(page, '{{bdr}}', MARGIN + 10, y + 74, 9, 'F1', PDF_COLORS.white);
+  text(page, 'Date', MARGIN + 10, y + 90, 7, 'F1', PDF_COLORS.gray);
 }
 
-/* Add photo pages into the PDF, two photos per page */
+/* Add photo pages in the three-up vertical layout used by the source documents. */
 async function addPhotoPages(doc, job, photos) {
   if (!photos.length) return;
 
-  let pageNum = 1;
-  for (let i = 0; i < photos.length; i += 2) {
+  const photoPrefix = job.documentType === 'qualityControl' ? 'Completion' : 'Precon';
+  for (let i = 0; i < photos.length; i += 3) {
     const page = newPdfPage(doc.logo);
-    addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job, 44, `Photo Page ${pageNum}`);
     const slots = [
-      { x: MARGIN, y: 126, w: PAGE_W - MARGIN * 2, h: 250 },
-      { x: MARGIN, y: 424, w: PAGE_W - MARGIN * 2, h: 250 }
+      { x: MARGIN, y: 46, w: 380, h: 218 },
+      { x: MARGIN, y: 278, w: 380, h: 218 },
+      { x: MARGIN, y: 510, w: 380, h: 218 }
     ];
 
-    for (let j = 0; j < 2 && i + j < photos.length; j++) {
+    for (let j = 0; j < 3 && i + j < photos.length; j++) {
       const photo = photos[i + j];
       const image = await photoToJpegImage(photo, 1700, 0.74);
       const slot = slots[j];
-      rectStroke(page, slot.x, slot.y, slot.w, slot.h, PDF_COLORS.teal);
-      const fit = fitRect(image.width, image.height, slot.w - 16, slot.h - 44);
-      imageOnPage(page, image, slot.x + (slot.w - fit.w) / 2, slot.y + 10, fit.w, fit.h);
-      wrappedText(page, photo.caption || `Photo ${i + j + 1}`, slot.x + 8, slot.y + slot.h - 20, slot.w - 16, 9, 11, 'F1', 2);
+      text(page, photo.caption || `${photoPrefix} ${i + j + 1}`, slot.x, slot.y + 10, 9, 'F2', PDF_COLORS.gray);
+      const fit = fitRect(image.width, image.height, slot.w, slot.h - 16);
+      imageOnPage(page, image, slot.x, slot.y + 16, fit.w, fit.h);
     }
 
-    addFooter(page, job);
     doc.pages.push(page);
-    pageNum++;
   }
 }
 
