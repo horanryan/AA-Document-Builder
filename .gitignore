@@ -1,2 +1,3 @@
 # Customer-generated reference PDFs contain private information.
 assets/*.pdf
+AGENTS.md
