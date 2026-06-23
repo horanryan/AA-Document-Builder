@@ -137,7 +137,7 @@ const QC_JOB_FIELDS = [
       'Tim R'
     ]
   },
-  { id: 'concreteCrew', label: 'Concrete Crew', options: ['', 'Canine Concrete', 'Wagle Concrete'] }
+  { id: 'concreteCrew', label: 'Concrete Crew', options: ['', 'Canine Concrete', 'Wagle Concrete', 'Level Up Innovations'] }
 ];
 
 const QC_INSPECTION_ITEMS = [
