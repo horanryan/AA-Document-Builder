@@ -3,8 +3,8 @@
   "short_name": "AA Docs",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f6f8ef",
-  "theme_color": "#35133e",
+  "background_color": "#f7f6f7",
+  "theme_color": "#4A3041",
   "icons": [
     { "src": "assets/absolute-aluminum-logo.png", "sizes": "any", "type": "image/png" }
   ]
