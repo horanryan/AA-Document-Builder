@@ -16,9 +16,14 @@ const REQUIRED_ELEMENT_IDS = [
 ];
 
 const SESSION_JOB_KEY = 'absolute-aluminum-current-job';
+const AUTO_SAVE_DELAY_MS = 700;
 
 let currentJob = blankJob();
 let deferredInstallPrompt = null;
+let autoSaveTimer = null;
+let autoSaveInFlight = null;
+let autoSaveQueued = false;
+let draftRevision = 0;
 const els = {};
 
 /* Initialize app when DOM is ready */
@@ -288,16 +293,22 @@ function bindEvents() {
   els.savedDraftsPanel.querySelector('summary').title = els.savedDraftsPanel.open ? 'Hide Saved Drafts' : 'Show Saved Drafts';
   els.savedDraftsPanel.querySelector('.saved-drafts-toggle-label').textContent = els.savedDraftsPanel.open ? 'Collapse' : 'Expand';
 
-  window.addEventListener('pagehide', writeCurrentJobSnapshot);
+  window.addEventListener('pagehide', () => {
+    writeCurrentJobSnapshot();
+    flushAutoSave();
+  });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') writeCurrentJobSnapshot();
+    if (document.visibilityState === 'hidden') {
+      writeCurrentJobSnapshot();
+      flushAutoSave();
+    }
   });
 
   bindAsyncClick(els.saveBtn, saveCurrentDraft, 'Save failed');
-  els.checklistForm.addEventListener('input', () => markDirty(true));
+  els.checklistForm.addEventListener('input', markDraftChanged);
   els.checklistForm.addEventListener('change', event => {
     if (event.target?.matches('[data-kind="job-field"]')) updateAdditionalInstallCrewFields();
-    markDirty(true);
+    markDraftChanged();
   });
 
   els.addPhotosBtn.addEventListener('click', () => {
@@ -371,6 +382,12 @@ function bindAsyncClick(el, action, label) {
 
 /* Track unsaved changes and update status indicators */
 function isDirty() { return els.dirtyPill && !els.dirtyPill.classList.contains('saved'); }
+/* Record a form edit and schedule a quiet save. */
+function markDraftChanged() {
+  draftRevision++;
+  markDirty(true);
+  queueAutoSave();
+}
 /* Update the draft-state badge after form or persistence changes. */
 function markDirty(dirty) {
   els.dirtyPill.textContent = dirty ? 'Unsaved' : 'Saved';
@@ -436,6 +453,43 @@ function readCurrentJobSnapshot() {
     console.warn('Could not restore current job snapshot', err);
     return null;
   }
+}
+
+/* Save soon after typing without interrupting the current input focus. */
+function queueAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(autoSaveCurrentDraft, AUTO_SAVE_DELAY_MS);
+}
+
+/* Try to persist immediately when the browser is about to background the app. */
+function flushAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  if (isDirty()) autoSaveCurrentDraft();
+}
+
+/* Persist the draft quietly, coalescing edits made while a save is in progress. */
+async function autoSaveCurrentDraft() {
+  if (autoSaveInFlight) {
+    autoSaveQueued = true;
+    return autoSaveInFlight;
+  }
+
+  autoSaveInFlight = persistCurrentDraft({
+    rehydrate: false,
+    statusMessage: `Autosaved draft at ${new Date().toLocaleTimeString()}.`
+  }).catch(err => {
+    console.error('Autosave failed', err);
+    setStatus(`Autosave failed: ${err.message || 'unknown error'}`);
+  }).finally(() => {
+    autoSaveInFlight = null;
+    if (autoSaveQueued) {
+      autoSaveQueued = false;
+      queueAutoSave();
+    }
+  });
+
+  return autoSaveInFlight;
 }
 
 /* Render a saved job record back into the form */
@@ -505,12 +559,26 @@ function getItemControl(kind, item) {
 
 /* Save current draft to IndexedDB and refresh UI state */
 async function saveCurrentDraft() {
+  await persistCurrentDraft({
+    rehydrate: true,
+    statusMessage: `Saved draft at ${new Date().toLocaleTimeString()}.`
+  });
+}
+
+/* Write the current draft and optionally refresh the rendered form. */
+async function persistCurrentDraft({ rehydrate = false, statusMessage = '' } = {}) {
+  const revisionAtSave = draftRevision;
   currentJob = collectJobFromForm();
   await putStore('jobs', currentJob);
   writeCurrentJobSnapshot(currentJob);
   await loadDraftList();
-  hydrateForm(currentJob);
-  setStatus(`Saved draft at ${new Date().toLocaleTimeString()}.`);
+  if (rehydrate) {
+    hydrateForm(currentJob);
+  } else {
+    els.currentJobTitle.textContent = draftTitle(currentJob, 'New Document');
+    if (draftRevision === revisionAtSave) markDirty(false);
+  }
+  if (statusMessage) setStatus(statusMessage);
 }
 
 /* Initialize IndexedDB if needed and hold a promise for later use */
