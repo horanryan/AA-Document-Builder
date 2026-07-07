@@ -508,6 +508,33 @@ button.full { width: 100%; margin-bottom: .75rem; }
   display: block;
 }
 
+.draft-title-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .5rem;
+}
+
+.draft-document-type {
+  font-weight: 800;
+  color: var(--plum);
+}
+
+.draft-downloaded-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--plum);
+  font-size: .9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
 .draft-delete-button {
   align-self: stretch;
   padding-inline: .75rem;

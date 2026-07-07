@@ -601,7 +601,11 @@ async function loadDraftList() {
     btn.className = 'draft-button';
     const doc = getDocumentDefinition(job.documentType);
     const title = draftTitle(job, 'Untitled Document');
-    btn.innerHTML = `<strong>${escapeHtml(title)}</strong><small>${escapeHtml(doc.label)}</small><small>${escapeHtml(formatAddress(job.fields))}</small><small>Updated ${new Date(job.updatedAt).toLocaleString()}</small>`;
+    const downloadedLabel = job.downloadedAt ? `Downloaded ${new Date(job.downloadedAt).toLocaleString()}` : '';
+    const downloadedIcon = job.downloadedAt
+      ? `<span class="draft-downloaded-icon" title="${escapeHtml(downloadedLabel)}" aria-label="${escapeHtml(downloadedLabel)}">&#10003;</span>`
+      : '';
+    btn.innerHTML = `<small class="draft-document-type">${escapeHtml(doc.label)}</small><span class="draft-title-line"><strong>${escapeHtml(title)}</strong>${downloadedIcon}</span><small>${escapeHtml(formatAddress(job.fields))}</small><small>Updated ${new Date(job.updatedAt).toLocaleString()}</small>`;
 
     btn.addEventListener('click', async () => {
       if (isDirty() && !confirm('Load this draft? Unsaved changes will be lost.')) return;
@@ -651,9 +655,8 @@ async function loadDraftList() {
 
 /* Build the saved-draft label from customer, job, and document metadata. */
 function draftTitle(job, fallback = 'Untitled Document') {
-  const doc = getDocumentDefinition(job?.documentType);
   const parts = [job?.fields?.jobNumberPhase, job?.fields?.customerName].filter(Boolean);
-  return parts.length ? `${parts.join(' - ')} (${doc.shortLabel})` : `${fallback} (${doc.shortLabel})`;
+  return parts.length ? parts.join(' - ') : fallback;
 }
 
 /* Combine populated address fields into one compact display string. */
