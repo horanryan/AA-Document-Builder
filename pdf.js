@@ -24,11 +24,11 @@ async function generatePacket() {
     const bytes = await buildDocumentPacketPdf(currentJob, photos);
     const filename = packetFilename(currentJob);
     const blob = new Blob([bytes], { type: 'application/pdf' });
-    downloadBlob(blob, filename);
     currentJob.downloadedAt = new Date().toISOString();
     await putStore('jobs', currentJob);
     writeCurrentJobSnapshot(currentJob);
     await loadDraftList();
+    downloadBlob(blob, filename);
     setStatus(`Generated ${filename} (${formatBytes(blob.size)}).`);
   } catch (err) {
     console.error(err);
