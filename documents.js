@@ -165,9 +165,9 @@ const QC_JOB_FIELDS = [
 ];
 
 const QC_INSPECTION_ITEMS = [
-  { id: 'superGutterSeamsFastened', label: 'Super Gutter seams fastened tight', options: ['', 'Yes', 'No'] },
+  { id: 'superGutterSeamsFastened', label: 'Super Gutter seams neatly fastened and leak free', options: ['', 'Yes', 'No'] },
   { id: 'doorsOperationalAndLock', label: 'Doors are operational and lock', options: ['', 'Yes', 'No'] },
-  { id: 'doorKeepersRemovedExplained', label: 'Door keepers removed and explained to customers', options: ['', 'Yes', 'No'] },
+  { id: 'doorKeepersRemovedExplained', label: 'Door keepers removed and explained to customers', options: ['', 'Yes', 'N/A'] },
   { id: 'bugSweepsNoGaps', label: 'Bug sweeps installed with no gaps', options: ['', 'Yes', 'No'] },
   { id: 'weepHoleAtBeamCaps', label: 'Weep hole at beam caps', options: ['', 'Yes', 'No'] },
   { id: 'screwProtecCapsComplete', label: 'Screw/Protec caps fasteners are complete', options: ['', 'Yes', 'No'] },
@@ -175,18 +175,19 @@ const QC_INSPECTION_ITEMS = [
   { id: 'ezCleansProperlyInstalled', label: 'EZ Cleans are properly installed', options: ['', 'Yes', 'No'] },
   { id: 'beamCapsInstalledProperly', label: 'Beam caps installed properly', options: ['', 'Yes', 'No'] },
   { id: 'screenFreeOfDefects', label: 'Screen is free of defects, wrinkles, and bubbles', options: ['', 'Yes', 'No'] },
-  { id: 'cableNutsTightNoPaverRub', label: 'Cable is and cable nuts are tight and not rubbing on pavers', options: ['', 'Yes', 'No'] },
+  { id: 'cableNutsTightNoPaverRub', label: 'Cables and cable nuts are tight and not rubbing on pavers', options: ['', 'Yes', 'No'] },
   { id: 'groundWireAttached', label: 'Ground wire is attached from cage to pump', options: ['', 'Yes', 'No'] },
   { id: 'retractableScreensOperational', label: 'Retractable screens are operational', options: ['', 'Yes', 'No'] }
 ];
 
 const QC_GUTTER_ITEMS = [
   { id: 'downspoutsProperLocation', label: 'Downspouts installed in proper location', options: ['', 'Yes', 'No'] },
-  { id: 'downspoutElbowsExtensionsInstalled', label: 'Downspouts ground level elbow with extensions are installed', options: ['', 'Yes', 'No'] },
+  { id: 'downspoutElbowsExtensionsInstalled', label: 'Downspout extensions are installed properly', options: ['', 'Yes', 'No'] },
   { id: 'divertersInstalled', label: 'Diverters Installed', options: ['', 'Yes', 'No'] },
   { id: 'leafGuardInstalled', label: 'Leaf Guard system installed', options: ['', 'Yes', 'No'] },
   { id: 'superGutterSeamsLeakFree', label: 'Super gutter seams are fastened tight and leak free', options: ['', 'Yes', 'No'] },
-  { id: 'hiddenHangersSealed', label: 'Hidden hangers are properly sealed', options: ['', 'Yes', 'No'] }
+  { id: 'endCapsMittersSealedLeakFree', label: 'End caps and mitters are sealed', options: ['', 'Yes', 'No'] },
+  { id: 'hiddenHangersSealed', label: 'Hidden hangers are properly spaced and attached', options: ['', 'Yes', 'No'] }
 ];
 const QC_PERGOLA_PAN6_ITEMS = [
   { id: 'louversOperational', label: 'Louvers are operational', options: ['', 'Yes', 'No'] },
@@ -194,7 +195,7 @@ const QC_PERGOLA_PAN6_ITEMS = [
   { id: 'materialScratchDentFree', label: 'Material is scratch & dent free', options: ['', 'Yes', 'No'] },
   { id: 'superGutterSeamsNeatLeakFree', label: 'Super gutter seams are fastened neat and leak free', options: ['', 'Yes', 'No'] },
   { id: 'doorsOperationalAndLockPergola', label: 'Doors are operational and lock', options: ['', 'Yes', 'No'] },
-  { id: 'doorKeepersRemovedExplainedPergola', label: 'Door keepers removed and explained to customers', options: ['', 'Yes', 'No'] },
+  { id: 'doorKeepersRemovedExplainedPergola', label: 'Door keepers removed and explained to customers', options: ['', 'Yes', 'N/A'] },
   { id: 'bugSweepsNoGapsPergola', label: 'Bug sweeps installed with no gaps', options: ['', 'Yes', 'No'] },
   { id: 'weepHoleAtBeamCapsPergola', label: 'Weep hole at beam caps', options: ['', 'Yes', 'No'] },
   { id: 'screwProtecCapsCompletePergola', label: 'Screw/Protec caps fasteners are complete', options: ['', 'Yes', 'No'] },
@@ -208,8 +209,8 @@ const QC_GENERAL_ITEMS = [
   { id: 'jobSiteClean', label: 'Job Site Clean', options: ['', 'Yes', 'No'] },
   { id: 'completionPerContract', label: 'Completion of Job per Contract', options: ['', 'Yes', 'No'] },
   { id: 'permitPosted', label: 'Permit Posted', options: ['', 'Yes', 'No', 'N/A'] },
-  { id: 'overallSatisfaction', label: 'Overall Satisfaction', options: ['', 'Yes', 'No'] },
-  { id: 'surveys', label: 'Surveys', options: ['', 'Yes', 'No'] },
+  { id: 'overallSatisfaction', label: 'Overall Satisfaction', options: ['', 'Satisfied', 'Unsatisfied'] },
+  { id: 'surveys', label: 'Google Review and Guild Quality Survey', options: ['', 'Yes', 'No'] },
   { id: 'paymentCollected', label: 'Payment Collected', options: ['', 'Yes', 'No', 'N/A'] },
   { id: 'tervisTumblers', label: 'Tervis Tumblers', options: ['', 'Yes', 'No'] }
 ];
@@ -219,12 +220,12 @@ const QC_INSPECTION_RESULT_ITEMS = [
     id: 'inspectionResults',
     label: 'Inspection Results',
     options: [
-      'N/A',
-      'GTG, Call in for county inspection',
-      'GTG, no county inspection required',
+      'Call in for county inspection',
+      'No county inspection required',
       'Punch List Required Before County Inspection',
       'Permit needs revise before Inspection',
-      'Call in for inspection after permit is posted'
+      'Call in for inspection after permit is posted',
+      'No Inspection, needs PC'
     ]
   },
   { id: 'punchListScheduleWeekOf', label: 'Punch List Schedule week of', type: 'date' }
