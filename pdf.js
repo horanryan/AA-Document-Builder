@@ -4,7 +4,6 @@ const PAGE_W = 612;
 const PAGE_H = 792;
 const MARGIN = 42;
 const HEADER_SAFE_RIGHT = PAGE_W - MARGIN;
-const HEADER_TITLE_MAX_W = 252;
 
 const PDF_COLORS = {
   plum: [0.290, 0.188, 0.255],
@@ -56,7 +55,7 @@ function packetFilename(job) {
 /* Build the PDF document structure for the selected packet */
 async function buildDocumentPacketPdf(job, photos) {
   job = normalizeJob(job);
-  const doc = { pages: [], logo: await loadPdfLogo(), brandText: await loadPdfBrandText(job), job };
+  const doc = { pages: [], logo: await loadPdfLogo(), job };
   await addDocumentPages(doc, job);
   await addPhotoPages(doc, job, photos);
   doc.pages.forEach((page, index) => addPageNumber(page, index + 1, doc.pages.length));
@@ -66,7 +65,7 @@ async function buildDocumentPacketPdf(job, photos) {
 /* Add the main form pages to the PDF document */
 async function addDocumentPages(doc, job) {
   const definition = getDocumentDefinition(job.documentType);
-  let page = newPdfPage(doc.logo, doc.brandText);
+  let page = newPdfPage(doc.logo);
   let y = startPdfPage(page, job);
   const jobFields = filledJobFields(job, definition);
 
@@ -96,7 +95,7 @@ async function addDocumentPages(doc, job) {
 }
 
 /* Create an empty PDF page container */
-function newPdfPage(logo = null, brandText = null) { return { commands: [], images: [], logo, brandText }; }
+function newPdfPage(logo = null) { return { commands: [], images: [], logo }; }
 
 /* Load and prepare the logo that is embedded in PDF pages */
 async function loadPdfLogo() {
@@ -106,57 +105,6 @@ async function loadPdfLogo() {
     console.warn('Logo could not be embedded in PDF', err);
     return null;
   }
-}
-
-/* Render brand-font headings as image snippets when browser font APIs are available. */
-async function loadPdfBrandText(job) {
-  if (typeof document === 'undefined' || !document.createElement) return null;
-  try {
-    if (document.fonts?.load) {
-      await Promise.all([
-        document.fonts.load('700 32px "Alkaline"'),
-        document.fonts.load('700 18px "Alkaline"')
-      ]);
-    }
-
-    const title = getDocumentDefinition(job.documentType).pdfTitle;
-    const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
-    return {
-      headerLines: await Promise.all(lines.map(lineText => brandTextImage(lineText, '700 32px "Alkaline", "Arial Black", sans-serif', '#4A3041', { padX: 10, padY: 5, maxDisplayW: HEADER_TITLE_MAX_W }))),
-      photoTitle: await brandTextImage('Photo Documentation', '700 22px "Alkaline", "Arial Black", sans-serif', '#4A3041', { padX: 5, padY: 4, maxDisplayW: 250 })
-    };
-  } catch (err) {
-    console.warn('Brand PDF heading fonts could not be rendered', err);
-    return null;
-  }
-}
-
-/* Draw a small canvas text label and return it as a JPEG image for PDF embedding. */
-async function brandTextImage(value, font, color, options = {}) {
-  const { padX = 4, padY = 3, maxDisplayW = Infinity } = options;
-  const scale = Math.max(4, Math.ceil((globalThis.devicePixelRatio || 1) * 2));
-  const measure = document.createElement('canvas').getContext('2d');
-  measure.font = font;
-  const metrics = measure.measureText(value);
-  const cssW = Math.ceil(metrics.width + padX * 2);
-  const cssH = Math.ceil((metrics.actualBoundingBoxAscent || 24) + (metrics.actualBoundingBoxDescent || 8) + padY * 2);
-  const canvas = document.createElement('canvas');
-  canvas.width = cssW * scale;
-  canvas.height = cssH * scale;
-  const ctx = canvas.getContext('2d', { alpha: false });
-  ctx.scale(scale, scale);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, cssW, cssH);
-  ctx.font = font;
-  ctx.fillStyle = color;
-  ctx.textBaseline = 'top';
-  ctx.fillText(value, padX, padY);
-  const displayScale = Math.min(1, maxDisplayW / cssW);
-  return {
-    ...(await dataUrlToJpegImage(canvas.toDataURL('image/jpeg', 1), 1800, 1)),
-    displayW: cssW * displayScale,
-    displayH: cssH * displayScale
-  };
 }
 
 /* Add the document header to each PDF page */
@@ -178,18 +126,10 @@ function addHeader(page, title, job) {
   }
 
   const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
-  const titleX = 322;
-  if (page.brandText?.headerLines?.length === 2) {
-    const [line1, line2] = page.brandText.headerLines;
-    const line1X = Math.min(titleX - 8, HEADER_SAFE_RIGHT - line1.displayW);
-    const line2IdealX = titleX + (lines[1] === 'REPORT' ? 36 : 30);
-    const line2X = Math.min(line2IdealX, HEADER_SAFE_RIGHT - line2.displayW);
-    imageOnPage(page, line1, line1X, 29, line1.displayW, line1.displayH);
-    imageOnPage(page, line2, line2X, 61, line2.displayW, line2.displayH);
-  } else {
-    text(page, lines[0], titleX, 43, 24, 'F2', PDF_COLORS.plum);
-    text(page, lines[1], titleX + (lines[1] === 'REPORT' ? 44 : 38), 73, 24, 'F2', PDF_COLORS.plum);
-  }
+  const titleX = 304;
+  const titleW = HEADER_SAFE_RIGHT - titleX;
+  fittedCenteredText(page, lines[0], titleX, titleW, 57, 26, 'F3', PDF_COLORS.plum);
+  fittedCenteredText(page, lines[1], titleX, titleW, 89, 26, 'F3', PDF_COLORS.plum);
 
   const customer = String(job.fields?.customerName || '').trim();
   const jobNumber = String(job.fields?.jobNumberPhase || '').trim();
@@ -210,7 +150,7 @@ function sectionBar(page, title, y) {
 function ensurePageSpace(doc, page, y, needed) {
   if (y + needed <= 752) return { page, y, newPage: false };
   doc.pages.push(page);
-  const nextPage = newPdfPage(doc.logo, doc.brandText);
+  const nextPage = newPdfPage(doc.logo);
   if (doc.job) addHeader(nextPage, getDocumentDefinition(doc.job.documentType).pdfTitle, doc.job);
   const nextY = doc.job ? 154 : 44;
   return { page: nextPage, y: nextY, newPage: true };
@@ -350,7 +290,7 @@ async function addPhotoPages(doc, job, photos) {
   if (!photos.length) return;
 
   for (let i = 0; i < photos.length; i += 3) {
-    const page = newPdfPage(doc.logo, doc.brandText);
+    const page = newPdfPage(doc.logo);
     addPhotoHeader(page, job);
     const slots = [
       { x: MARGIN, y: 86, w: 420, h: 204 },
@@ -376,11 +316,7 @@ async function addPhotoPages(doc, job, photos) {
 function addPhotoHeader(page, job) {
   rectFill(page, 0, 52, PAGE_W, 5, PDF_COLORS.lime);
   rectFill(page, 0, 57, PAGE_W, 3, PDF_COLORS.teal);
-  if (page.brandText?.photoTitle) {
-    imageOnPage(page, page.brandText.photoTitle, MARGIN - 4, 14, page.brandText.photoTitle.displayW, page.brandText.photoTitle.displayH);
-  } else {
-    text(page, 'Photo Documentation', MARGIN, 34, 16, 'F2', PDF_COLORS.plum);
-  }
+  text(page, 'Photo Documentation', MARGIN, 34, 16, 'F3', PDF_COLORS.plum);
   const customer = String(job.fields?.customerName || '').trim();
   if (customer) textRight(page, customer, HEADER_SAFE_RIGHT, 46, 8.5, 'F1', PDF_COLORS.gray);
 }
@@ -437,6 +373,13 @@ function textRight(page, value, rightX, yTop, size = 10, font = 'F1', color = nu
   text(page, value, rightX - helveticaTextWidth(value, size), yTop, size, font, color);
 }
 
+/* Center text in a fixed box, reducing size when needed so it never hits the page edge. */
+function fittedCenteredText(page, value, x, width, yTop, size = 10, font = 'F1', color = null) {
+  const fittedSize = Math.max(16, Math.min(size, size * width / Math.max(helveticaTextWidth(value, size), 1)));
+  const textW = helveticaTextWidth(value, fittedSize);
+  text(page, value, x + (width - textW) / 2, yTop, fittedSize, font, color);
+}
+
 /* Wrap text to a fixed width and append one PDF command per line. */
 function wrappedText(page, value, x, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity) {
   const chars = Math.max(12, Math.floor(width / (size * 0.52)));
@@ -470,7 +413,7 @@ function pdfRgb(color) { return color.map(fmt).join(' '); }
 function buildPdf(doc) {
   const images = [];
   doc.pages.forEach(page => page.images.forEach(img => images.push(img)));
-  let nextObj = 5;
+  let nextObj = 6;
   images.forEach(img => { img.obj = nextObj++; });
   doc.pages.forEach(page => { page.contentObj = nextObj++; page.pageObj = nextObj++; });
 
@@ -479,13 +422,14 @@ function buildPdf(doc) {
   objects[2] = `<< /Type /Pages /Kids [${doc.pages.map(p => `${p.pageObj} 0 R`).join(' ')}] /Count ${doc.pages.length} >>`;
   objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
   objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>';
+  objects[5] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-BoldOblique >>';
   images.forEach(img => { objects[img.obj] = imageObject(img); });
 
   doc.pages.forEach(page => {
     const content = ['0 g', '0.7 w', ...page.commands].join('\n');
     objects[page.contentObj] = streamObject(asciiBytes(content));
     const xObjects = page.images.length ? `/XObject << ${page.images.map(img => `/${img.name} ${img.obj} 0 R`).join(' ')} >>` : '';
-    objects[page.pageObj] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> ${xObjects} >> /Contents ${page.contentObj} 0 R >>`;
+    objects[page.pageObj] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> ${xObjects} >> /Contents ${page.contentObj} 0 R >>`;
   });
 
   const chunks = [];
