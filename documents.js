@@ -215,6 +215,12 @@ const QC_GENERAL_ITEMS = [
   { id: 'tervisTumblers', label: 'Tervis Tumblers', options: ['', 'Yes', 'No'] }
 ];
 
+const QC_CONCRETE_INSPECTION_ITEMS = [
+  { id: 'deckToppingStainPaversTravertineInstalled', label: 'Deck topping, stain, pavers, travertine are installed', options: ['', 'Yes', 'No'] },
+  { id: 'concreteAreaCleanOfDebris', label: 'Area is left clean of debris (form boards, concrete chunks, dirt mounds)', options: ['', 'Yes', 'No'] },
+  { id: 'oversplashWipedOffHouseWindows', label: 'All over splash is wiped off house and windows', options: ['', 'Yes', 'No'] }
+];
+
 const QC_INSPECTION_RESULT_ITEMS = [
   {
     id: 'inspectionResults',
@@ -263,6 +269,7 @@ const DOCUMENT_TYPES = {
       { key: 'items', title: 'Enclosures', pdfTitle: 'ENCLOSURES', continuedTitle: 'Enclosures continued', items: QC_INSPECTION_ITEMS },
       { key: 'gutters', title: 'Gutters', pdfTitle: 'GUTTERS', continuedTitle: 'Gutters continued', items: QC_GUTTER_ITEMS },
       { key: 'pergolaPan6', title: 'Pergola & Pan6', pdfTitle: 'PERGOLA & PAN6', continuedTitle: 'Pergola & Pan6 continued', items: QC_PERGOLA_PAN6_ITEMS },
+      { key: 'concreteInspection', title: 'Concrete', pdfTitle: 'CONCRETE', continuedTitle: 'Concrete continued', items: QC_CONCRETE_INSPECTION_ITEMS },
       { key: 'general', title: 'General Section', pdfTitle: 'GENERAL SECTION', continuedTitle: 'General Section continued', items: QC_GENERAL_ITEMS },
       { key: 'inHouse', title: 'Inspection Results', pdfTitle: 'INSPECTION RESULTS', continuedTitle: 'Inspection Results continued', items: QC_INSPECTION_RESULT_ITEMS }
     ]
