@@ -17,6 +17,13 @@ const PDF_COLORS = {
   white: [1, 1, 1]
 };
 
+const ITEM_TABLE_X = MARGIN;
+const ITEM_TABLE_W = PAGE_W - MARGIN * 2;
+const ITEM_LABEL_X = MARGIN + 10;
+const ITEM_LABEL_W = 185;
+const ITEM_RESPONSE_X = ITEM_LABEL_X + ITEM_LABEL_W + 18;
+const ITEM_RESPONSE_W = ITEM_TABLE_X + ITEM_TABLE_W - ITEM_RESPONSE_X - 10;
+
 /* Persist the current form, generate its PDF bytes, and download the packet. */
 async function generatePacket() {
   try {
@@ -34,6 +41,7 @@ async function generatePacket() {
     await putStore('jobs', currentJob);
     writeCurrentJobSnapshot(currentJob);
     await loadDraftList();
+    setPdfPreviewGuard(currentJob);
     downloadBlob(blob, filename);
     setStatus(`Generated ${filename} (${formatBytes(blob.size)}).`);
   } catch (err) {
@@ -107,7 +115,7 @@ async function loadPdfLogo() {
   }
 }
 
-/* Add the document header to each PDF page */
+/* Add the full document header to the first PDF form page. */
 function startPdfPage(page, job) {
   addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job);
   return 154;
@@ -151,9 +159,7 @@ function ensurePageSpace(doc, page, y, needed) {
   if (y + needed <= 752) return { page, y, newPage: false };
   doc.pages.push(page);
   const nextPage = newPdfPage(doc.logo);
-  if (doc.job) addHeader(nextPage, getDocumentDefinition(doc.job.documentType).pdfTitle, doc.job);
-  const nextY = doc.job ? 154 : 44;
-  return { page: nextPage, y: nextY, newPage: true };
+  return { page: nextPage, y: 44, newPage: true };
 }
 
 /* Match the references' unobtrusive page count in the upper-right corner. */
@@ -222,10 +228,18 @@ function itemDisplayValue(item, row) {
   return item.options ? row.selection || '' : row.value || '';
 }
 
-/* Size rows for wrapped answers plus enough bottom padding to clear the border. */
+/* Estimate wrapped line count for a PDF text box. */
+function wrappedLineCount(value, width, size) {
+  const chars = Math.max(12, Math.floor(width / (size * 0.52)));
+  return wrapText(value, chars).length;
+}
+
+/* Size rows for side-by-side question and response text. */
 function itemRowHeight(item, row) {
-  const message = itemPdfMessage(item, row);
-  return Math.max(34, 24 + wrapText(message, 98).length * 9);
+  const response = itemPdfMessage(item, row);
+  const labelLines = wrappedLineCount(item.label, ITEM_LABEL_W, 7.5);
+  const responseLines = wrappedLineCount(response, ITEM_RESPONSE_W, 8.5);
+  return Math.max(34, 18 + Math.max(labelLines * 9, responseLines * 9));
 }
 
 /* Add a table of checklist items to the PDF */
@@ -245,14 +259,18 @@ function addItemTable(doc, page, job, items, values, y, continuationTitle) {
   return { page, y: y + 4 };
 }
 
-/* Draw every typed or selected answer below its label for consistent scanning. */
+/* Draw each checklist item as a compact question column with a wider response column. */
 function addItemRow(page, item, row, y, h) {
-  const message = itemPdfMessage(item, row);
-  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.white);
-  rectFill(page, MARGIN, y, 4, h, PDF_COLORS.lime);
-  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.lightGray);
-  text(page, item.label, MARGIN + 10, y + 12, 7.5, 'F2', PDF_COLORS.plum);
-  wrappedText(page, message, MARGIN + 26, y + 25, PAGE_W - MARGIN * 2 - 34, 8.5, 9, 'F1');
+  const response = itemPdfMessage(item, row);
+  rectFill(page, ITEM_TABLE_X, y, ITEM_TABLE_W, h, PDF_COLORS.white);
+  rectFill(page, ITEM_TABLE_X, y, 4, h, PDF_COLORS.lime);
+  rectStroke(page, ITEM_TABLE_X, y, ITEM_TABLE_W, h, PDF_COLORS.lightGray);
+  wrappedText(page, item.label, ITEM_LABEL_X, y + 13, ITEM_LABEL_W, 7.5, 9, 'F2', Infinity, PDF_COLORS.plum);
+  if (wrappedLineCount(response, ITEM_RESPONSE_W, 8.5) === 1) {
+    wrappedTextRight(page, response, ITEM_RESPONSE_X + ITEM_RESPONSE_W, y + 13, ITEM_RESPONSE_W, 8.5, 9, 'F2', Infinity, PDF_COLORS.text);
+  } else {
+    wrappedText(page, response, ITEM_RESPONSE_X, y + 13, ITEM_RESPONSE_W, 8.5, 9, 'F2', Infinity, PDF_COLORS.text);
+  }
 }
 
 /* Prefer configured acknowledgment wording over the raw selected value. */
@@ -381,10 +399,18 @@ function fittedCenteredText(page, value, x, width, yTop, size = 10, font = 'F1',
 }
 
 /* Wrap text to a fixed width and append one PDF command per line. */
-function wrappedText(page, value, x, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity) {
+function wrappedText(page, value, x, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity, color = null) {
   const chars = Math.max(12, Math.floor(width / (size * 0.52)));
   const lines = wrapText(value, chars).slice(0, maxLines);
-  lines.forEach((lineText, index) => text(page, lineText, x, yTop + index * lineHeight, size, font));
+  lines.forEach((lineText, index) => text(page, lineText, x, yTop + index * lineHeight, size, font, color));
+  return yTop + lines.length * lineHeight;
+}
+
+/* Wrap text to a fixed width and align each line to the same right edge. */
+function wrappedTextRight(page, value, rightX, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity, color = null) {
+  const chars = Math.max(12, Math.floor(width / (size * 0.52)));
+  const lines = wrapText(value, chars).slice(0, maxLines);
+  lines.forEach((lineText, index) => textRight(page, lineText, rightX, yTop + index * lineHeight, size, font, color));
   return yTop + lines.length * lineHeight;
 }
 

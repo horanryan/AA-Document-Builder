@@ -16,6 +16,9 @@ const REQUIRED_ELEMENT_IDS = [
 ];
 
 const SESSION_JOB_KEY = 'absolute-aluminum-current-job';
+const LOCAL_JOB_KEY = 'absolute-aluminum-current-job-backup';
+const PDF_PREVIEW_GUARD_KEY = 'absolute-aluminum-pdf-preview-guard';
+const PDF_PREVIEW_GUARD_MS = 10 * 60 * 1000;
 const AUTO_SAVE_DELAY_MS = 700;
 
 let currentJob = blankJob();
@@ -297,10 +300,15 @@ function bindEvents() {
     writeCurrentJobSnapshot();
     flushAutoSave();
   });
+  window.addEventListener('pageshow', () => {
+    restoreCurrentJobSnapshotIfNeeded();
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       writeCurrentJobSnapshot();
       flushAutoSave();
+    } else if (document.visibilityState === 'visible') {
+      restoreCurrentJobSnapshotIfNeeded();
     }
   });
 
@@ -384,6 +392,7 @@ function bindAsyncClick(el, action, label) {
 function isDirty() { return els.dirtyPill && !els.dirtyPill.classList.contains('saved'); }
 /* Record a form edit and schedule a quiet save. */
 function markDraftChanged() {
+  clearPdfPreviewGuard();
   draftRevision++;
   markDirty(true);
   queueAutoSave();
@@ -438,7 +447,11 @@ function collectItemGroup(kind, list) {
 function writeCurrentJobSnapshot(job = null) {
   try {
     const snapshot = job || collectJobFromForm();
-    sessionStorage.setItem(SESSION_JOB_KEY, JSON.stringify(snapshot));
+    const existing = readCurrentJobSnapshot();
+    if (shouldKeepExistingPreviewDraft(existing, snapshot)) return;
+    const raw = JSON.stringify(snapshot);
+    sessionStorage.setItem(SESSION_JOB_KEY, raw);
+    localStorage.setItem(LOCAL_JOB_KEY, raw);
   } catch (err) {
     console.warn('Could not snapshot current job', err);
   }
@@ -447,12 +460,124 @@ function writeCurrentJobSnapshot(job = null) {
 /* Read the same-tab form snapshot created before Safari/iOS leaves for PDF preview. */
 function readCurrentJobSnapshot() {
   try {
-    const raw = sessionStorage.getItem(SESSION_JOB_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const sessionJob = parseStoredJob(sessionStorage.getItem(SESSION_JOB_KEY));
+    const localJob = parseStoredJob(localStorage.getItem(LOCAL_JOB_KEY));
+    return richestJob(sessionJob, localJob);
   } catch (err) {
     console.warn('Could not restore current job snapshot', err);
     return null;
   }
+}
+
+/* Parse a stored draft without letting storage corruption break startup. */
+function parseStoredJob(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('Ignoring invalid stored draft snapshot', err);
+    return null;
+  }
+}
+
+/* Recover the rendered form after iOS/Safari returns from an in-tab PDF preview. */
+async function restoreCurrentJobSnapshotIfNeeded() {
+  try {
+    const guard = getPdfPreviewGuard();
+    if (!guard || !isPdfPreviewGuardActive(guard.jobId)) return;
+
+    const storedSnapshot = readCurrentJobSnapshot();
+    const savedJob = guard.jobId ? await getJob(guard.jobId) : null;
+    const snapshot = richestJob(storedSnapshot, savedJob);
+    if (!snapshot) return;
+
+    const liveJob = collectJobFromForm(snapshot.documentType);
+    if (jobContentScore(snapshot) > jobContentScore(liveJob)) {
+      hydrateForm(snapshot);
+      setStatus('Restored draft after PDF preview.');
+    }
+  } catch (err) {
+    console.warn('Could not restore PDF preview draft', err);
+  }
+}
+
+/* Mark the current draft as protected while iOS may navigate to a blob preview. */
+function setPdfPreviewGuard(job) {
+  try {
+    localStorage.setItem(PDF_PREVIEW_GUARD_KEY, JSON.stringify({
+      jobId: job.id,
+      createdAt: Date.now()
+    }));
+  } catch (err) {
+    console.warn('Could not protect PDF preview draft', err);
+  }
+}
+
+/* Remove preview protection after the user edits the restored form. */
+function clearPdfPreviewGuard() {
+  try {
+    localStorage.removeItem(PDF_PREVIEW_GUARD_KEY);
+  } catch (err) {
+    console.warn('Could not clear PDF preview protection', err);
+  }
+}
+
+/* Return whether the recent PDF preview guard still applies to a draft. */
+function isPdfPreviewGuardActive(jobId = null) {
+  const guard = getPdfPreviewGuard();
+  if (!guard) return false;
+  if (Date.now() - Number(guard.createdAt || 0) > PDF_PREVIEW_GUARD_MS) {
+    clearPdfPreviewGuard();
+    return false;
+  }
+  return !jobId || guard.jobId === jobId;
+}
+
+/* Read the active PDF preview guard, if any. */
+function getPdfPreviewGuard() {
+  try {
+    return parseStoredJob(localStorage.getItem(PDF_PREVIEW_GUARD_KEY));
+  } catch (err) {
+    console.warn('Could not read PDF preview protection', err);
+    return null;
+  }
+}
+
+/* During PDF preview return, avoid replacing a good draft with a sparse same-draft copy. */
+function shouldKeepExistingPreviewDraft(existing, next) {
+  if (!existing || !next) return false;
+  const existingJob = normalizeJob(existing);
+  const nextJob = normalizeJob(next);
+  return isPdfPreviewGuardActive(existingJob.id)
+    && existingJob.id === nextJob.id
+    && jobContentScore(existingJob) > jobContentScore(nextJob);
+}
+
+/* Choose the draft copy with the most visible content. */
+function richestJob(...jobs) {
+  return jobs
+    .filter(Boolean)
+    .map(normalizeJob)
+    .sort((a, b) => jobContentScore(b) - jobContentScore(a))[0] || null;
+}
+
+/* Count filled draft values so a richer backup can recover a sparsely restored form. */
+function jobContentScore(job) {
+  if (!job) return 0;
+  const doc = getDocumentDefinition(job.documentType);
+  let score = 0;
+  doc.fields.forEach(field => { if (hasPlainValue(job.fields?.[field.id])) score++; });
+  if (hasPlainValue(job.summaryNotes)) score++;
+  doc.groups.forEach(group => group.items.forEach(item => {
+    const row = job[group.key]?.[item.id] || {};
+    if (hasPlainValue(item.options ? row.selection : row.value)) score++;
+  }));
+  return score;
+}
+
+/* Check whether a draft value contains user-visible content. */
+function hasPlainValue(value) {
+  return String(value ?? '').trim().length > 0;
 }
 
 /* Save soon after typing without interrupting the current input focus. */
@@ -568,7 +693,16 @@ async function saveCurrentDraft() {
 /* Write the current draft and optionally refresh the rendered form. */
 async function persistCurrentDraft({ rehydrate = false, statusMessage = '' } = {}) {
   const revisionAtSave = draftRevision;
-  currentJob = collectJobFromForm();
+  const nextJob = collectJobFromForm();
+  const existingJob = nextJob.id ? await getJob(nextJob.id) : null;
+  if (shouldKeepExistingPreviewDraft(existingJob, nextJob)) {
+    currentJob = normalizeJob(existingJob);
+    writeCurrentJobSnapshot(currentJob);
+    if (rehydrate) hydrateForm(currentJob);
+    if (statusMessage) setStatus('Kept restored draft after PDF preview.');
+    return;
+  }
+  currentJob = nextJob;
   await putStore('jobs', currentJob);
   writeCurrentJobSnapshot(currentJob);
   await loadDraftList();
