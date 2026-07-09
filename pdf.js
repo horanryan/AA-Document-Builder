@@ -3,11 +3,18 @@
 const PAGE_W = 612;
 const PAGE_H = 792;
 const MARGIN = 42;
+const HEADER_SAFE_RIGHT = PAGE_W - MARGIN;
+const HEADER_TITLE_MAX_W = 252;
 
 const PDF_COLORS = {
-  plum: [0.208, 0.075, 0.243],
-  lightGray: [0.82, 0.84, 0.86],
-  gray: [0.38, 0.4, 0.43],
+  plum: [0.290, 0.188, 0.255],
+  teal: [0, 0.573, 0.737],
+  lime: [0.769, 0.839, 0],
+  plumSoft: [0.953, 0.937, 0.949],
+  tealSoft: [0.906, 0.961, 0.976],
+  lightGray: [0.87, 0.84, 0.86],
+  gray: [0.38, 0.34, 0.38],
+  text: [0.184, 0.145, 0.173],
   white: [1, 1, 1]
 };
 
@@ -49,7 +56,7 @@ function packetFilename(job) {
 /* Build the PDF document structure for the selected packet */
 async function buildDocumentPacketPdf(job, photos) {
   job = normalizeJob(job);
-  const doc = { pages: [], logo: await loadPdfLogo() };
+  const doc = { pages: [], logo: await loadPdfLogo(), brandText: await loadPdfBrandText(job), job };
   await addDocumentPages(doc, job);
   await addPhotoPages(doc, job, photos);
   doc.pages.forEach((page, index) => addPageNumber(page, index + 1, doc.pages.length));
@@ -59,7 +66,7 @@ async function buildDocumentPacketPdf(job, photos) {
 /* Add the main form pages to the PDF document */
 async function addDocumentPages(doc, job) {
   const definition = getDocumentDefinition(job.documentType);
-  let page = newPdfPage(doc.logo);
+  let page = newPdfPage(doc.logo, doc.brandText);
   let y = startPdfPage(page, job);
   const jobFields = filledJobFields(job, definition);
 
@@ -89,7 +96,7 @@ async function addDocumentPages(doc, job) {
 }
 
 /* Create an empty PDF page container */
-function newPdfPage(logo = null) { return { commands: [], images: [], logo }; }
+function newPdfPage(logo = null, brandText = null) { return { commands: [], images: [], logo, brandText }; }
 
 /* Load and prepare the logo that is embedded in PDF pages */
 async function loadPdfLogo() {
@@ -101,44 +108,117 @@ async function loadPdfLogo() {
   }
 }
 
+/* Render brand-font headings as image snippets when browser font APIs are available. */
+async function loadPdfBrandText(job) {
+  if (typeof document === 'undefined' || !document.createElement) return null;
+  try {
+    if (document.fonts?.load) {
+      await Promise.all([
+        document.fonts.load('700 32px "Alkaline"'),
+        document.fonts.load('700 18px "Alkaline"')
+      ]);
+    }
+
+    const title = getDocumentDefinition(job.documentType).pdfTitle;
+    const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
+    return {
+      headerLines: await Promise.all(lines.map(lineText => brandTextImage(lineText, '700 32px "Alkaline", "Arial Black", sans-serif', '#4A3041', { padX: 10, padY: 5, maxDisplayW: HEADER_TITLE_MAX_W }))),
+      photoTitle: await brandTextImage('Photo Documentation', '700 22px "Alkaline", "Arial Black", sans-serif', '#4A3041', { padX: 5, padY: 4, maxDisplayW: 250 })
+    };
+  } catch (err) {
+    console.warn('Brand PDF heading fonts could not be rendered', err);
+    return null;
+  }
+}
+
+/* Draw a small canvas text label and return it as a JPEG image for PDF embedding. */
+async function brandTextImage(value, font, color, options = {}) {
+  const { padX = 4, padY = 3, maxDisplayW = Infinity } = options;
+  const scale = Math.max(4, Math.ceil((globalThis.devicePixelRatio || 1) * 2));
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const metrics = measure.measureText(value);
+  const cssW = Math.ceil(metrics.width + padX * 2);
+  const cssH = Math.ceil((metrics.actualBoundingBoxAscent || 24) + (metrics.actualBoundingBoxDescent || 8) + padY * 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = cssW * scale;
+  canvas.height = cssH * scale;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.scale(scale, scale);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cssW, cssH);
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textBaseline = 'top';
+  ctx.fillText(value, padX, padY);
+  const displayScale = Math.min(1, maxDisplayW / cssW);
+  return {
+    ...(await dataUrlToJpegImage(canvas.toDataURL('image/jpeg', 1), 1800, 1)),
+    displayW: cssW * displayScale,
+    displayH: cssH * displayScale
+  };
+}
+
 /* Add the document header to each PDF page */
 function startPdfPage(page, job) {
-  addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job, 28);
-  return 150;
+  addHeader(page, getDocumentDefinition(job.documentType).pdfTitle, job);
+  return 154;
 }
 
-/* Draw the logo-led title used by the source PreCon and Zero Defect documents. */
-function addHeader(page, title, job, yTop) {
+/* Draw an Absolute Aluminum branded header for generated packets. */
+function addHeader(page, title, job) {
+  const headerH = 118;
+  rectFill(page, 0, headerH, PAGE_W, 5, PDF_COLORS.lime);
+  rectFill(page, 0, headerH + 5, PAGE_W, 3, PDF_COLORS.teal);
+  line(page, MARGIN, headerH - 5, PAGE_W - MARGIN, headerH - 5, PDF_COLORS.lightGray);
+
   if (page.logo) {
-    const logoFit = fitRect(page.logo.width, page.logo.height, 170, 94);
-    imageOnPage(page, page.logo, MARGIN, yTop + 6, logoFit.w, logoFit.h);
+    const logoFit = fitRect(page.logo.width, page.logo.height, 190, 76);
+    imageOnPage(page, page.logo, MARGIN, 22, logoFit.w, logoFit.h);
   }
+
   const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
-  const titleX = 344;
-  text(page, lines[0], titleX, yTop + 38, 23, 'F2', PDF_COLORS.plum);
-  text(page, lines[1], titleX + (lines[1] === 'REPORT' ? 40 : 42), yTop + 67, 23, 'F2', PDF_COLORS.plum);
+  const titleX = 322;
+  if (page.brandText?.headerLines?.length === 2) {
+    const [line1, line2] = page.brandText.headerLines;
+    const line1X = Math.min(titleX - 8, HEADER_SAFE_RIGHT - line1.displayW);
+    const line2IdealX = titleX + (lines[1] === 'REPORT' ? 36 : 30);
+    const line2X = Math.min(line2IdealX, HEADER_SAFE_RIGHT - line2.displayW);
+    imageOnPage(page, line1, line1X, 29, line1.displayW, line1.displayH);
+    imageOnPage(page, line2, line2X, 61, line2.displayW, line2.displayH);
+  } else {
+    text(page, lines[0], titleX, 43, 24, 'F2', PDF_COLORS.plum);
+    text(page, lines[1], titleX + (lines[1] === 'REPORT' ? 44 : 38), 73, 24, 'F2', PDF_COLORS.plum);
+  }
+
+  const customer = String(job.fields?.customerName || '').trim();
+  const jobNumber = String(job.fields?.jobNumberPhase || '').trim();
+  const meta = [customer, jobNumber].filter(Boolean).join(' | ');
+  if (meta) textRight(page, meta, HEADER_SAFE_RIGHT, 103, 8.5, 'F1', PDF_COLORS.gray);
 }
 
-/* Draw a title-cased section label and return the next content position. */
+/* Draw a filled section label and return the next content position. */
 function sectionBar(page, title, y) {
   const displayTitle = title.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
-  text(page, displayTitle, MARGIN, y + 11, 11, 'F2', PDF_COLORS.plum);
-  line(page, MARGIN, y + 14, PAGE_W - MARGIN, y + 14, PDF_COLORS.gray);
-  return y + 16;
+  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, 22, PDF_COLORS.plum);
+  rectFill(page, MARGIN, y + 20, PAGE_W - MARGIN * 2, 3, PDF_COLORS.teal);
+  text(page, displayTitle, MARGIN + 10, y + 14.5, 10.5, 'F2', PDF_COLORS.white);
+  return y + 28;
 }
 
 /* Ensure enough space remains on the current PDF page or create a new page */
 function ensurePageSpace(doc, page, y, needed) {
   if (y + needed <= 752) return { page, y, newPage: false };
   doc.pages.push(page);
-  const nextPage = newPdfPage(doc.logo);
-  const nextY = 44;
+  const nextPage = newPdfPage(doc.logo, doc.brandText);
+  if (doc.job) addHeader(nextPage, getDocumentDefinition(doc.job.documentType).pdfTitle, doc.job);
+  const nextY = doc.job ? 154 : 44;
   return { page: nextPage, y: nextY, newPage: true };
 }
 
 /* Match the references' unobtrusive page count in the upper-right corner. */
 function addPageNumber(page, pageNumber, pageCount) {
-  textRight(page, `Page ${pageNumber} of ${pageCount}`, PAGE_W - 24, 28, 8, 'F1', PDF_COLORS.gray);
+  textRight(page, `Page ${pageNumber} of ${pageCount}`, HEADER_SAFE_RIGHT, 28, 8, 'F1', PDF_COLORS.gray);
 }
 
 /* Return only job fields that contain printable content. */
@@ -186,11 +266,13 @@ function selectedWording(item, row) {
 /* Render compact label/value rows inside one outlined section. */
 function addJobInfo(page, job, y, fields = filledJobFields(job)) {
   const rowH = 18;
-  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, fields.length * rowH, PDF_COLORS.gray);
+  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, fields.length * rowH, PDF_COLORS.white);
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, fields.length * rowH, PDF_COLORS.lightGray);
   fields.forEach((field, idx) => {
     const rowY = y + idx * rowH;
-    text(page, field.label, MARGIN + 6, rowY + 12, 7.5, 'F2');
-    textRight(page, field.value ?? job.fields?.[field.id] ?? '', PAGE_W - MARGIN - 6, rowY + 12, 9, 'F1');
+    if (idx % 2 === 1) rectFill(page, MARGIN, rowY, PAGE_W - MARGIN * 2, rowH, PDF_COLORS.plumSoft);
+    text(page, field.label, MARGIN + 8, rowY + 12, 7.5, 'F2', PDF_COLORS.plum);
+    textRight(page, field.value ?? job.fields?.[field.id] ?? '', PAGE_W - MARGIN - 8, rowY + 12, 9, 'F1', PDF_COLORS.text);
   });
   return y + fields.length * rowH + 4;
 }
@@ -226,9 +308,11 @@ function addItemTable(doc, page, job, items, values, y, continuationTitle) {
 /* Draw every typed or selected answer below its label for consistent scanning. */
 function addItemRow(page, item, row, y, h) {
   const message = itemPdfMessage(item, row);
+  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.white);
+  rectFill(page, MARGIN, y, 4, h, PDF_COLORS.lime);
   rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.lightGray);
-  text(page, item.label, MARGIN + 6, y + 12, 7.5, 'F2');
-  wrappedText(page, message, MARGIN + 24, y + 25, PAGE_W - MARGIN * 2 - 30, 8.5, 9, 'F1');
+  text(page, item.label, MARGIN + 10, y + 12, 7.5, 'F2', PDF_COLORS.plum);
+  wrappedText(page, message, MARGIN + 26, y + 25, PAGE_W - MARGIN * 2 - 34, 8.5, 9, 'F1');
 }
 
 /* Prefer configured acknowledgment wording over the raw selected value. */
@@ -241,8 +325,9 @@ function itemPdfMessage(item, row) {
 /* Add summary notes block to the PDF */
 function addSummaryBlock(page, job, y) {
   const h = Math.min(110, Math.max(44, wrapText(job.summaryNotes || ' ', 106).length * 9 + 24));
-  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.gray);
-  text(page, 'Notes', MARGIN + 6, y + 12, 7.5, 'F2');
+  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.tealSoft);
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.teal);
+  text(page, 'Notes', MARGIN + 8, y + 12, 7.5, 'F2', PDF_COLORS.plum);
   wrappedText(page, job.summaryNotes || ' ', MARGIN + 24, y + 27, PAGE_W - MARGIN * 2 - 30, 8.5, 9.5, 'F1');
   return y + h + 6;
 }
@@ -250,12 +335,14 @@ function addSummaryBlock(page, job, y) {
 /* Place the invisible One Click signature/date tokens on visible signing lines. */
 function addSignatureBlock(page, job, y) {
   const lineW = 310;
-  line(page, MARGIN, y + 46, MARGIN + lineW, y + 46, PDF_COLORS.gray);
+  rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, 96, PDF_COLORS.white);
+  rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, 96, PDF_COLORS.lightGray);
+  line(page, MARGIN + 12, y + 46, MARGIN + 12 + lineW, y + 46, PDF_COLORS.gray);
   text(page, '{{bsr}}', MARGIN + 6, y + 36, 12, 'F1', PDF_COLORS.white);
-  text(page, job.fields?.customerName || 'Customer', MARGIN + 10, y + 58, 7.5, 'F2', PDF_COLORS.plum);
-  line(page, MARGIN, y + 78, MARGIN + lineW, y + 78, PDF_COLORS.gray);
+  text(page, job.fields?.customerName || 'Customer', MARGIN + 16, y + 58, 7.5, 'F2', PDF_COLORS.plum);
+  line(page, MARGIN + 12, y + 78, MARGIN + 12 + lineW, y + 78, PDF_COLORS.gray);
   text(page, '{{bdr}}', MARGIN + 10, y + 74, 9, 'F1', PDF_COLORS.white);
-  text(page, 'Date', MARGIN + 10, y + 90, 7, 'F1', PDF_COLORS.gray);
+  text(page, 'Date', MARGIN + 16, y + 90, 7, 'F1', PDF_COLORS.gray);
 }
 
 /* Add photo pages in the three-up vertical layout used by the source documents. */
@@ -263,24 +350,39 @@ async function addPhotoPages(doc, job, photos) {
   if (!photos.length) return;
 
   for (let i = 0; i < photos.length; i += 3) {
-    const page = newPdfPage(doc.logo);
+    const page = newPdfPage(doc.logo, doc.brandText);
+    addPhotoHeader(page, job);
     const slots = [
-      { x: MARGIN, y: 46, w: 380, h: 218 },
-      { x: MARGIN, y: 278, w: 380, h: 218 },
-      { x: MARGIN, y: 510, w: 380, h: 218 }
+      { x: MARGIN, y: 86, w: 420, h: 204 },
+      { x: MARGIN, y: 318, w: 420, h: 204 },
+      { x: MARGIN, y: 550, w: 420, h: 176 }
     ];
 
     for (let j = 0; j < 3 && i + j < photos.length; j++) {
       const photo = photos[i + j];
       const image = await photoToJpegImage(photo, 1700, 0.74);
       const slot = slots[j];
-      text(page, photoLabel(job, photo, i + j + 1), slot.x, slot.y + 10, 9, 'F2', PDF_COLORS.gray);
+      text(page, photoLabel(job, photo, i + j + 1), slot.x, slot.y + 10, 9, 'F2', PDF_COLORS.plum);
       const fit = fitRect(image.width, image.height, slot.w, slot.h - 16);
+      rectStroke(page, slot.x, slot.y + 16, slot.w, slot.h - 16, PDF_COLORS.lightGray);
       imageOnPage(page, image, slot.x, slot.y + 16, fit.w, fit.h);
     }
 
     doc.pages.push(page);
   }
+}
+
+/* Add a compact branded heading to appended photo pages. */
+function addPhotoHeader(page, job) {
+  rectFill(page, 0, 52, PAGE_W, 5, PDF_COLORS.lime);
+  rectFill(page, 0, 57, PAGE_W, 3, PDF_COLORS.teal);
+  if (page.brandText?.photoTitle) {
+    imageOnPage(page, page.brandText.photoTitle, MARGIN - 4, 14, page.brandText.photoTitle.displayW, page.brandText.photoTitle.displayH);
+  } else {
+    text(page, 'Photo Documentation', MARGIN, 34, 16, 'F2', PDF_COLORS.plum);
+  }
+  const customer = String(job.fields?.customerName || '').trim();
+  if (customer) textRight(page, customer, HEADER_SAFE_RIGHT, 46, 8.5, 'F1', PDF_COLORS.gray);
 }
 
 /* Label QC photos as Photo N, with optional caption text after the number. */
@@ -353,6 +455,12 @@ function line(page, x1, y1Top, x2, y2Top, color = null) {
 function rectStroke(page, x, yTop, w, h, color = null) {
   const command = `${fmt(x)} ${fmt(PAGE_H - yTop - h)} ${fmt(w)} ${fmt(h)} re S`;
   page.commands.push(color ? `q ${pdfRgb(color)} RG ${command} Q` : command);
+}
+
+/* Add a filled rectangle in top-origin coordinates. */
+function rectFill(page, x, yTop, w, h, color = null) {
+  const command = `${fmt(x)} ${fmt(PAGE_H - yTop - h)} ${fmt(w)} ${fmt(h)} re f`;
+  page.commands.push(color ? `q ${pdfRgb(color)} rg ${command} Q` : command);
 }
 
 /* Convert a normalized RGB array into PDF color operands. */
