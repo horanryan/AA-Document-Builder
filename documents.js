@@ -217,6 +217,7 @@ const QC_GENERAL_ITEMS = [
 
 const QC_CONCRETE_INSPECTION_ITEMS = [
   { id: 'deckToppingStainPaversTravertineInstalled', label: 'Deck topping, stain, pavers, travertine are installed', options: ['', 'Yes', 'No'] },
+  { id: 'doorPadInstalledProperly', label: 'Door pad installed properly', options: ['', 'Yes', 'No'] },
   { id: 'concreteAreaCleanOfDebris', label: 'Area is left clean of debris (form boards, concrete chunks, dirt mounds)', options: ['', 'Yes', 'No'] },
   { id: 'oversplashWipedOffHouseWindows', label: 'All over splash is wiped off house and windows', options: ['', 'Yes', 'No'] }
 ];
