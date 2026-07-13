@@ -6,7 +6,7 @@ const CUSTOMER_ACK_OPTIONS = ['', 'Customer Acknowledges', 'N/A'];
 const DISPLAYED_WORDING = {
   irrigationLines: [['Customer Acknowledges', "Customer understands and acknowledges that Absolute Aluminum will not handle anything to do with sprinklers/lines etc. and that it is the customer's responsibility."]],
   bushes: [['Customer Acknowledges', 'Customer understands and acknowledges their responsibility to ensure the work area is prepared and cleared of vegetation prior to our arrival. A minimum of 2 feet of clearance is required around the work area. Vegetation taller than 3 feet must be trimmed down to allow safe ladder placement and access.']],
-  equipment: [['Customer Acknowledges', 'Customer understands and acknowledges that Absolute Aluminum is not responsible for any damage to landscaping, sod, sprinklers, yard ruts etc. in work area. In some instances, we will hold off on your project during the rainy season to avoid severe damage to your yard. Re-sodding around foundation work is not included.']],
+  sitePrep: [['Customer Acknowledges', 'Customer understands and acknowledges that Absolute Aluminum is not responsible for any damage to landscaping, sod, sprinklers, yard ruts etc. in work area. In some instances, we will hold off on your project during the rainy season to avoid severe damage to your yard. Re-sodding around foundation work is not included.']],
   drawPayment: [['Customer Acknowledges', 'Customer has received, understands and acknowledges the draw schedule and will submit payments accordingly.']],
   tearoutTarping: [['Customer Acknowledges', 'Customer understands and acknowledges that the pool cannot be tarped as this is a life safety issue.']],
   tearoutCleanup: [['Customer Acknowledges', 'Customer understands and acknowledges our process is to cut back and clean up old caulking as best we can as well as fill old holes. This does not include painting or stucco repair.']],
@@ -65,8 +65,8 @@ const INSTALL_CREW_OPTIONS = [
 const INSPECTION_ITEMS = [
   { id: 'irrigationLines', label: 'Irrigation Lines', options: CUSTOMER_ACK_OPTIONS },
   { id: 'bushes', label: 'Bushes', options: CUSTOMER_ACK_OPTIONS },
-  { id: 'equipment', label: 'Equipment', options: CUSTOMER_ACK_OPTIONS },
-  { id: 'sitePrep', label: 'Site Prep', input: 'text' },
+  { id: 'equipment', label: 'Equipment', input: 'text' },
+  { id: 'sitePrep', label: 'Site Prep', options: CUSTOMER_ACK_OPTIONS },
   { id: 'drawPayment', label: 'Draw payment', options: CUSTOMER_ACK_OPTIONS },
   { id: 'tearoutTarping', label: 'Tearout (tarping of the pool)', options: CUSTOMER_ACK_OPTIONS },
   { id: 'tearoutCleanup', label: 'Tearout (Clean up & fill holes)', options: CUSTOMER_ACK_OPTIONS },
