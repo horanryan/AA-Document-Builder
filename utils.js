@@ -94,16 +94,12 @@ function formatBytes(bytes) {
   return `${n.toFixed(n >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-/* Create a filename safe for common filesystems while preserving readable spaces. */
+/* Replace filesystem-invalid filename characters while preserving entered text. */
 function safeFilename(value) {
   const cleaned = String(value || '')
-    .trim()
-    .replace(/[<>:"\/\\|?*\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[. ]+$/g, '')
-    .slice(0, 60)
-    .replace(/[. ]+$/g, '');
-  return cleaned || 'PreCon';
+    .replace(/,/g, '')
+    .replace(/[<>:"\/\\|?*\u0000-\u001f\u007f]/g, ' ');
+  return cleaned.trim() ? cleaned : 'PreCon';
 }
 /* Escape user-provided text before inserting it into generated HTML. */
 function escapeHtml(value) {

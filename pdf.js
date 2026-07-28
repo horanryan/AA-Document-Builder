@@ -51,13 +51,14 @@ async function generatePacket() {
   }
 }
 
-/* Build a stable, filesystem-safe filename from the customer and job number. */
+/* Build a name_job-number_file-type filename with filesystem-safe text sections. */
 function packetFilename(job) {
   const doc = getDocumentDefinition(job.documentType);
   const jobNumberPhase = String(job.fields?.jobNumberPhase || '').trim();
-  const jobNum = jobNumberPhase.match(/^\d+/)?.[0] || '';
+  const jobNumber = jobNumberPhase.match(/^\d+/)?.[0] || '';
   const customer = safeFilename(job.fields?.customerName || 'Customer');
-  return `${[customer, jobNum, doc.filenameLabel].filter(Boolean).join('_')}.pdf`;
+  const documentLabel = safeFilename(doc.filenameLabel);
+  return `${[customer, jobNumber, documentLabel].filter(Boolean).join('_')}.pdf`;
 }
 
 /* Build the PDF document structure for the selected packet */
@@ -228,17 +229,16 @@ function itemDisplayValue(item, row) {
   return item.options ? row.selection || '' : row.value || '';
 }
 
-/* Estimate wrapped line count for a PDF text box. */
-function wrappedLineCount(value, width, size) {
-  const chars = Math.max(12, Math.floor(width / (size * 0.52)));
-  return wrapText(value, chars).length;
+/* Count the lines produced using the selected PDF font's real glyph widths. */
+function wrappedLineCount(value, width, size, font = 'F1') {
+  return wrapPdfText(value, width, size, font).length;
 }
 
 /* Size rows for side-by-side question and response text. */
 function itemRowHeight(item, row) {
   const response = itemPdfMessage(item, row);
-  const labelLines = wrappedLineCount(item.label, ITEM_LABEL_W, 7.5);
-  const responseLines = wrappedLineCount(response, ITEM_RESPONSE_W, 8.5);
+  const labelLines = wrappedLineCount(item.label, ITEM_LABEL_W, 7.5, 'F2');
+  const responseLines = wrappedLineCount(response, ITEM_RESPONSE_W, 8.5, 'F2');
   return Math.max(34, 18 + Math.max(labelLines * 9, responseLines * 9));
 }
 
@@ -266,7 +266,7 @@ function addItemRow(page, item, row, y, h) {
   rectFill(page, ITEM_TABLE_X, y, 4, h, PDF_COLORS.lime);
   rectStroke(page, ITEM_TABLE_X, y, ITEM_TABLE_W, h, PDF_COLORS.lightGray);
   wrappedText(page, item.label, ITEM_LABEL_X, y + 13, ITEM_LABEL_W, 7.5, 9, 'F2', Infinity, PDF_COLORS.plum);
-  if (wrappedLineCount(response, ITEM_RESPONSE_W, 8.5) === 1) {
+  if (wrappedLineCount(response, ITEM_RESPONSE_W, 8.5, 'F2') === 1) {
     wrappedTextRight(page, response, ITEM_RESPONSE_X + ITEM_RESPONSE_W, y + 13, ITEM_RESPONSE_W, 8.5, 9, 'F2', Infinity, PDF_COLORS.text);
   } else {
     wrappedText(page, response, ITEM_RESPONSE_X, y + 13, ITEM_RESPONSE_W, 8.5, 9, 'F2', Infinity, PDF_COLORS.text);
@@ -282,7 +282,8 @@ function itemPdfMessage(item, row) {
 
 /* Add summary notes block to the PDF */
 function addSummaryBlock(page, job, y) {
-  const h = Math.min(110, Math.max(44, wrapText(job.summaryNotes || ' ', 106).length * 9 + 24));
+  const notesWidth = PAGE_W - MARGIN * 2 - 30;
+  const h = Math.min(110, Math.max(44, wrappedLineCount(job.summaryNotes || ' ', notesWidth, 8.5, 'F1') * 9.5 + 24));
   rectFill(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.tealSoft);
   rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, h, PDF_COLORS.teal);
   text(page, 'Notes', MARGIN + 8, y + 12, 7.5, 'F2', PDF_COLORS.plum);
@@ -378,38 +379,91 @@ const HELVETICA_WIDTHS = {
   '{': 334, '|': 260, '}': 334, '~': 584
 };
 
-/* Measure text using the same Helvetica metrics embedded in the PDF. */
-function helveticaTextWidth(value, size) {
+/* Helvetica-Bold and Helvetica-BoldOblique share these standard PDF widths. */
+const HELVETICA_BOLD_WIDTHS = {
+  ' ': 278, '!': 333, '"': 474, '#': 556, '$': 556, '%': 889, '&': 722, "'": 238,
+  '(': 333, ')': 333, '*': 389, '+': 584, ',': 278, '-': 333, '.': 278, '/': 278,
+  ':': 333, ';': 333, '<': 584, '=': 584, '>': 584, '?': 611, '@': 975,
+  A: 722, B: 722, C: 722, D: 722, E: 667, F: 611, G: 778, H: 722, I: 278,
+  J: 556, K: 722, L: 611, M: 833, N: 722, O: 778, P: 667, Q: 778, R: 722,
+  S: 667, T: 611, U: 722, V: 667, W: 944, X: 667, Y: 667, Z: 611,
+  '[': 333, '\\': 278, ']': 333, '^': 584, _: 556, '`': 333,
+  a: 556, b: 611, c: 556, d: 611, e: 556, f: 333, g: 611, h: 611, i: 278,
+  j: 278, k: 556, l: 278, m: 889, n: 611, o: 611, p: 611, q: 611, r: 389,
+  s: 556, t: 333, u: 611, v: 556, w: 778, x: 556, y: 556, z: 500,
+  '{': 389, '|': 280, '}': 389, '~': 584
+};
+
+/* Measure text using the metrics of the base font embedded in the PDF. */
+function helveticaTextWidth(value, size, font = 'F1') {
+  const widths = font === 'F1' ? HELVETICA_WIDTHS : HELVETICA_BOLD_WIDTHS;
   return Array.from(pdfCleanText(value)).reduce((width, char) => {
-    const glyphWidth = char >= '0' && char <= '9' ? 556 : (HELVETICA_WIDTHS[char] || 556);
+    const glyphWidth = char >= '0' && char <= '9' ? 556 : (widths[char] || 556);
     return width + glyphWidth;
   }, 0) * size / 1000;
 }
 
 /* Right-align text to an exact shared edge using Helvetica font metrics. */
 function textRight(page, value, rightX, yTop, size = 10, font = 'F1', color = null) {
-  text(page, value, rightX - helveticaTextWidth(value, size), yTop, size, font, color);
+  text(page, value, rightX - helveticaTextWidth(value, size, font), yTop, size, font, color);
 }
 
 /* Center text in a fixed box, reducing size when needed so it never hits the page edge. */
 function fittedCenteredText(page, value, x, width, yTop, size = 10, font = 'F1', color = null) {
-  const fittedSize = Math.max(16, Math.min(size, size * width / Math.max(helveticaTextWidth(value, size), 1)));
-  const textW = helveticaTextWidth(value, fittedSize);
+  const fittedSize = Math.max(16, Math.min(size, size * width / Math.max(helveticaTextWidth(value, size, font), 1)));
+  const textW = helveticaTextWidth(value, fittedSize, font);
   text(page, value, x + (width - textW) / 2, yTop, fittedSize, font, color);
+}
+
+/* Wrap PDF text by measured width, splitting an oversized word when necessary. */
+function wrapPdfText(value, width, size, font = 'F1') {
+  const input = pdfCleanText(value || '').replace(/\s+/g, ' ').trim();
+  if (!input) return [''];
+
+  const lines = [];
+  let lineText = '';
+  const pushWord = word => {
+    const candidate = lineText ? `${lineText} ${word}` : word;
+    if (helveticaTextWidth(candidate, size, font) <= width) {
+      lineText = candidate;
+      return;
+    }
+    if (lineText) {
+      lines.push(lineText);
+      lineText = '';
+    }
+    if (helveticaTextWidth(word, size, font) <= width) {
+      lineText = word;
+      return;
+    }
+
+    let segment = '';
+    Array.from(word).forEach(char => {
+      if (segment && helveticaTextWidth(segment + char, size, font) > width) {
+        lines.push(segment);
+        segment = char;
+      } else {
+        segment += char;
+      }
+    });
+    lineText = segment;
+  };
+
+  input.split(' ').forEach(pushWord);
+  if (lineText) lines.push(lineText);
+  return lines;
 }
 
 /* Wrap text to a fixed width and append one PDF command per line. */
 function wrappedText(page, value, x, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity, color = null) {
-  const chars = Math.max(12, Math.floor(width / (size * 0.52)));
-  const lines = wrapText(value, chars).slice(0, maxLines);
+  const lines = wrapPdfText(value, width, size, font).slice(0, maxLines);
   lines.forEach((lineText, index) => text(page, lineText, x, yTop + index * lineHeight, size, font, color));
   return yTop + lines.length * lineHeight;
 }
 
 /* Wrap text to a fixed width and align each line to the same right edge. */
 function wrappedTextRight(page, value, rightX, yTop, width, size = 10, lineHeight = 12, font = 'F1', maxLines = Infinity, color = null) {
-  const chars = Math.max(12, Math.floor(width / (size * 0.52)));
-  const lines = wrapText(value, chars).slice(0, maxLines);
+  const lines = wrapPdfText(value, width, size, font).slice(0, maxLines);
   lines.forEach((lineText, index) => textRight(page, lineText, rightX, yTop + index * lineHeight, size, font, color));
   return yTop + lines.length * lineHeight;
 }
