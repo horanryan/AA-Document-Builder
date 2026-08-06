@@ -123,6 +123,7 @@ const IN_HOUSE_ITEMS = [
   { id: 'existingBoxMiter', label: 'Existing Box Miter', input: 'text' },
   { id: 'overhangDimensions', label: 'Overhang Dimensions', input: 'text' },
   { id: 'stepUpDimensions', label: 'Step-Up Dimensions', input: 'text' },
+  { id: 'deckMeasurements', label: 'Deck Measurements', input: 'text' },
   { id: 'bayWindowMeasurements', label: 'Bay Window Measurements', input: 'text' },
   { id: 'noc', label: 'NOC', options: ['', 'Needs Signature/Submittal', 'Signed and Submitted', 'N/A'] }
 ];
