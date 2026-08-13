@@ -304,27 +304,28 @@ function addSignatureBlock(page, job, y) {
   text(page, 'Date', MARGIN + 16, y + 90, 7, 'F1', PDF_COLORS.gray);
 }
 
-/* Add photo pages in the three-up vertical layout used by the source documents. */
+/* Add photo pages in a large two-up layout while preserving each image's aspect ratio. */
 async function addPhotoPages(doc, job, photos) {
   if (!photos.length) return;
 
-  for (let i = 0; i < photos.length; i += 3) {
+  const slots = [
+    { x: MARGIN, labelY: 82, imageY: 94, w: PAGE_W - MARGIN * 2, h: 310 },
+    { x: MARGIN, labelY: 420, imageY: 432, w: PAGE_W - MARGIN * 2, h: 310 }
+  ];
+
+  for (let i = 0; i < photos.length; i += slots.length) {
     const page = newPdfPage(doc.logo);
     addPhotoHeader(page, job);
-    const slots = [
-      { x: MARGIN, y: 86, w: 420, h: 204 },
-      { x: MARGIN, y: 318, w: 420, h: 204 },
-      { x: MARGIN, y: 550, w: 420, h: 176 }
-    ];
 
-    for (let j = 0; j < 3 && i + j < photos.length; j++) {
+    for (let j = 0; j < slots.length && i + j < photos.length; j++) {
       const photo = photos[i + j];
       const image = await photoToJpegImage(photo, 1700, 0.74);
       const slot = slots[j];
-      text(page, photoLabel(job, photo, i + j + 1), slot.x, slot.y + 10, 9, 'F2', PDF_COLORS.plum);
-      const fit = fitRect(image.width, image.height, slot.w, slot.h - 16);
-      rectStroke(page, slot.x, slot.y + 16, slot.w, slot.h - 16, PDF_COLORS.lightGray);
-      imageOnPage(page, image, slot.x, slot.y + 16, fit.w, fit.h);
+      text(page, photoLabel(photo, i + j + 1), slot.x, slot.labelY, 9, 'F2', PDF_COLORS.plum);
+      const fit = fitRect(image.width, image.height, slot.w, slot.h);
+      const imageX = slot.x + (slot.w - fit.w) / 2;
+      const imageY = slot.imageY + (slot.h - fit.h) / 2;
+      imageOnPage(page, image, imageX, imageY, fit.w, fit.h);
     }
 
     doc.pages.push(page);
@@ -340,14 +341,11 @@ function addPhotoHeader(page, job) {
   if (customer) textRight(page, customer, HEADER_SAFE_RIGHT, 46, 8.5, 'F1', PDF_COLORS.gray);
 }
 
-/* Label QC photos as Photo N, with optional caption text after the number. */
-function photoLabel(job, photo, number) {
+/* Label every document photo as Photo N, with optional caption text after the number. */
+function photoLabel(photo, number) {
   const caption = String(photo.caption || '').trim();
-  if (job.documentType === 'qualityControl') {
-    const base = `Photo ${number}`;
-    return caption ? `${base}: ${caption}` : base;
-  }
-  return caption || `Precon ${number}`;
+  const base = `Photo ${number}`;
+  return caption ? `${base}: ${caption}` : base;
 }
 
 /* Place an image object on a PDF page */
