@@ -93,7 +93,7 @@ const INSPECTION_ITEMS = [
   { id: 'communicationPreference', label: 'Communication Preference', options: ['', 'Email', 'Text', 'Call', 'N/A'] },
   { id: 'construction', label: 'Construction', options: CUSTOMER_ACK_OPTIONS },
   { id: 'installShavings', label: 'Install/Possible Shavings', options: CUSTOMER_ACK_OPTIONS },
-  { id: 'warrantyInformation', label: 'Warranty Information', options: ['', '5 Year Abso-Shield', 'N/A'] },
+  { id: 'warrantyInformation', label: 'Warranty Information', options: ['', '5 Year Abso-Shield','10 Year Abso-Shield', 'N/A'] },
   { id: 'tuffScreenWarranty', label: 'Tuff Screen Warranty', options: ['', '10 Year Manufacturers Warranty', 'N/A'] },
   { id: 'qualityControl', label: 'Quality Control/Inspections/Permits', options: CUSTOMER_ACK_OPTIONS },
   { id: 'finalPayment', label: 'Final Payment', options: CUSTOMER_ACK_OPTIONS },
