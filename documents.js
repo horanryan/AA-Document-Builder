@@ -39,7 +39,8 @@ const ADDRESS_FIELDS = [
 ];
 
 const JOB_FIELDS = [
-  { id: 'customerName', label: 'Customer Name', type: 'text' },
+  { id: 'firstName', label: 'First Name', type: 'text', autocomplete: 'given-name' },
+  { id: 'lastName', label: 'Last Name', type: 'text', autocomplete: 'family-name' },
   ...ADDRESS_FIELDS,
   { id: 'email', label: 'Email', type: 'email' },
   { id: 'phone', label: 'Phone #', type: 'tel' },
@@ -129,7 +130,8 @@ const IN_HOUSE_ITEMS = [
 ];
 
 const QC_JOB_FIELDS = [
-  { id: 'customerName', label: 'Customer Name', type: 'text' },
+  { id: 'firstName', label: 'First Name', type: 'text', autocomplete: 'given-name' },
+  { id: 'lastName', label: 'Last Name', type: 'text', autocomplete: 'family-name' },
   ...ADDRESS_FIELDS,
   { id: 'email', label: 'Email', type: 'email' },
   { id: 'phone', label: 'Phone #', type: 'tel' },

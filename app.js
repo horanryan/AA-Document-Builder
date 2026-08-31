@@ -86,6 +86,13 @@ function normalizeJob(job) {
   const out = job || blankJob();
   out.documentType = getDocumentDefinition(out.documentType).id;
   out.fields = out.fields || {};
+  if (!String(out.fields.firstName || '').trim()
+    && !String(out.fields.lastName || '').trim()
+    && String(out.fields.customerName || '').trim()) {
+    const legacyName = splitCustomerName(out.fields.customerName);
+    out.fields.firstName = legacyName.firstName;
+    out.fields.lastName = legacyName.lastName;
+  }
   if (!Object.prototype.hasOwnProperty.call(out.fields, 'streetAddress')
     && out.fields.address
     && !out.fields.city
@@ -365,7 +372,7 @@ async function switchDocumentType(nextType) {
   const previous = collectJobFromForm(currentJob.documentType);
   const nextJob = blankJob();
   nextJob.documentType = nextType;
-  ['customerName', 'streetAddress', 'city', 'state', 'zip', 'address', 'email', 'phone', 'jobNumberPhase', 'gateCode'].forEach(id => {
+  ['firstName', 'lastName', 'streetAddress', 'city', 'state', 'zip', 'address', 'email', 'phone', 'jobNumberPhase', 'gateCode'].forEach(id => {
     if (previous.fields?.[id]) nextJob.fields[id] = previous.fields[id];
   });
   currentJob = nextJob;
@@ -789,7 +796,7 @@ async function loadDraftList() {
 
 /* Build the saved-draft label from customer, job, and document metadata. */
 function draftTitle(job, fallback = 'Untitled Document') {
-  const parts = [job?.fields?.jobNumberPhase, job?.fields?.customerName].filter(Boolean);
+  const parts = [job?.fields?.jobNumberPhase, formatCustomerName(job?.fields)].filter(Boolean);
   return parts.length ? parts.join(' - ') : fallback;
 }
 

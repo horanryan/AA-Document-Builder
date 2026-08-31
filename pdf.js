@@ -56,7 +56,7 @@ function packetFilename(job) {
   const doc = getDocumentDefinition(job.documentType);
   const jobNumberPhase = String(job.fields?.jobNumberPhase || '').trim();
   const jobNumber = jobNumberPhase.match(/^\d+/)?.[0] || '';
-  const customer = safeFilename(job.fields?.customerName || 'Customer');
+  const customer = safeFilename(formatCustomerName(job.fields) || 'Customer');
   const documentLabel = safeFilename(doc.filenameLabel);
   return `${[customer, jobNumber, documentLabel].filter(Boolean).join('_')}.pdf`;
 }
@@ -140,7 +140,7 @@ function addHeader(page, title, job) {
   fittedCenteredText(page, lines[0], titleX, titleW, 57, 26, 'F3', PDF_COLORS.plum);
   fittedCenteredText(page, lines[1], titleX, titleW, 89, 26, 'F3', PDF_COLORS.plum);
 
-  const customer = String(job.fields?.customerName || '').trim();
+  const customer = formatCustomerName(job.fields);
   const jobNumber = String(job.fields?.jobNumberPhase || '').trim();
   const meta = [customer, jobNumber].filter(Boolean).join(' | ');
   if (meta) textRight(page, meta, HEADER_SAFE_RIGHT, 103, 8.5, 'F1', PDF_COLORS.gray);
@@ -170,11 +170,21 @@ function addPageNumber(page, pageNumber, pageCount) {
 
 /* Return only job fields that contain printable content. */
 function filledJobFields(job, definition = getDocumentDefinition(job.documentType)) {
+  const customerNameIds = new Set(['firstName', 'lastName']);
   const addressIds = new Set(['streetAddress', 'city', 'state', 'zip']);
   const fields = [];
+  let customerNameAdded = false;
   let addressAdded = false;
 
   definition.fields.forEach(field => {
+    if (customerNameIds.has(field.id)) {
+      if (!customerNameAdded) {
+        const value = formatCustomerName(job.fields);
+        if (hasPdfValue(value)) fields.push({ id: 'customerName', label: 'Customer Name', value });
+        customerNameAdded = true;
+      }
+      return;
+    }
     if (addressIds.has(field.id)) {
       if (!addressAdded) {
         const value = formatAddress(job.fields);
@@ -298,7 +308,7 @@ function addSignatureBlock(page, job, y) {
   rectStroke(page, MARGIN, y, PAGE_W - MARGIN * 2, 96, PDF_COLORS.lightGray);
   line(page, MARGIN + 12, y + 46, MARGIN + 12 + lineW, y + 46, PDF_COLORS.gray);
   text(page, '{{bsr}}', MARGIN + 6, y + 36, 12, 'F1', PDF_COLORS.white);
-  text(page, job.fields?.customerName || 'Customer', MARGIN + 16, y + 58, 7.5, 'F2', PDF_COLORS.plum);
+  text(page, formatCustomerName(job.fields) || 'Customer', MARGIN + 16, y + 58, 7.5, 'F2', PDF_COLORS.plum);
   line(page, MARGIN + 12, y + 78, MARGIN + 12 + lineW, y + 78, PDF_COLORS.gray);
   text(page, '{{bdr}}', MARGIN + 10, y + 74, 9, 'F1', PDF_COLORS.white);
   text(page, 'Date', MARGIN + 16, y + 90, 7, 'F1', PDF_COLORS.gray);
@@ -337,7 +347,7 @@ function addPhotoHeader(page, job) {
   rectFill(page, 0, 52, PAGE_W, 5, PDF_COLORS.lime);
   rectFill(page, 0, 57, PAGE_W, 3, PDF_COLORS.teal);
   text(page, 'Photo Documentation', MARGIN, 34, 16, 'F3', PDF_COLORS.plum);
-  const customer = String(job.fields?.customerName || '').trim();
+  const customer = formatCustomerName(job.fields);
   if (customer) textRight(page, customer, HEADER_SAFE_RIGHT, 46, 8.5, 'F1', PDF_COLORS.gray);
 }
 

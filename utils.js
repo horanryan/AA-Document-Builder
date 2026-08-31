@@ -101,6 +101,22 @@ function safeFilename(value) {
     .replace(/[<>:"\/\\|?*\u0000-\u001f\u007f]/g, ' ');
   return cleaned.trim() ? cleaned : 'PreCon';
 }
+
+/* Split a legacy customer name so older saved drafts populate the new fields. */
+function splitCustomerName(value) {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return { firstName: parts[0] || '', lastName: '' };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+}
+
+/* Build the customer's display name from separate fields with legacy fallback. */
+function formatCustomerName(fields = {}) {
+  const name = [fields.firstName, fields.lastName]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return name || String(fields.customerName || '').trim();
+}
 /* Escape user-provided text before inserting it into generated HTML. */
 function escapeHtml(value) {
    return String(value ?? '')
