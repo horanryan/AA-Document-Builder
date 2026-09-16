@@ -106,6 +106,7 @@ const INSPECTION_ITEMS = [
   { id: 'chairRailHeight', label: 'Chair Rail Height', options: ['', '16"', '24"', '30"', '36"', '40"', '48"', 'N/A'] },
   { id: 'nebula', label: 'Nebula', options: ['', 'Colored LEDs', 'White LEDs', 'N/A'] },
   { id: 'pergola', label: 'Pergola', input: 'text' },
+  { id: 'compositePanels', label: 'Composite Panels', input: 'text' },
   { id: 'dogDoor', label: 'Dog Door', options: ['', 'S', 'M', 'L', 'XL', 'N/A'] },
   { id: 'passThruDoors', label: 'Pass Thru Doors', options: ['', '1', '2', 'N/A'] },
   { id: 'undergroundDrainClause', label: 'Underground Drain Clause', options: ['', 'Customer Acknowledges + Release', 'N/A'] },
