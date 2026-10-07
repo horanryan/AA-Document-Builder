@@ -168,6 +168,191 @@ const QC_JOB_FIELDS = [
   { id: 'concreteCrew', label: 'Concrete Crew', options: ['', 'Canine Concrete', 'Wagle Concrete', 'Level Up Innovations'] }
 ];
 
+const MATERIAL_GROUPS = [
+  {
+    name: 'Fasteners',
+    items: [
+      '1-3/4" Quickset',
+      '2-1/4" Quickset',
+      '3-1/4" Quickset',
+      '5" Quickset',
+      '6" Quickset',
+      '3/8 x 3" Bolt SS LTD',
+      '3/8 x 5" Bolt SS LTD',
+      '3/8 x 7" Bolt SS LTD',
+      '3" Self Tapper SS',
+      '8 x 1/2" SS',
+      '10 x 1" SS',
+      '10 x 3/4" SS',
+      '10 x 1-1/2" SS',
+      '10 x 2" SS',
+      '10 x 3" SS',
+      '10 x 4" SS',
+      '12 x 3/4" SS',
+      '12 x 1" SS',
+      '12 x 2" SS',
+      '14 X 1" SS',
+      '10 x 2" Nylo-Tec',
+      '10 x 3" Nylo-Tec',
+      '12 x 1" Nylo-Tec',
+      '14 x 1" Nylo-Tec',
+      '18 x 2" Nylo-Tec',
+      'Blue Tap 1-3/4" Pro-Tect',
+      'Blue Tap 2-1/4" Pro-Tect',
+      'Blue Tap 3-1/4" Pro-Tect',
+      'Blue Tap 5" Pro-Tect',
+      'Blue Tap 6" Pro-Tect',
+      'EZ Cleans',
+      'Cap',
+      'Washer',
+      'Shank'
+    ]
+  },
+  {
+    name: 'Extrusion',
+    items: [
+      '1 x 2"',
+      '2 x 2"',
+      '1/2 x 2" Patio w/ Spline Groove',
+      '2 x 3" Patio',
+      '2 x 4" Patio',
+      '3 x 3 x .093" SQ TUBE',
+      '3 x 3 x .125" SQ TUBE',
+      '4 x 4 x .125" SQ TUBE',
+      '1 x 3" OB',
+      '2" Receiving Channel',
+      '3" Receiving Channel',
+      '4" Receiving Channel',
+      'Extruded Kick Plate',
+      'Pass Thru Door',
+      'Corner Jack',
+      '2 x 4" SMB',
+      '2 x 5" SMB',
+      '2 x 6" SMB',
+      '2 x 7" SMB',
+      '2 x 8" SMB',
+      '2 x 9" SMB',
+      '2 x 10" SMB',
+      '1 x 1" AR Angle',
+      '1 x 2" AR Angle',
+      '2 x 2" AR Angle',
+      '1 x 1" Angle',
+      '1 x 2" Angle',
+      '1 x 3" Angle',
+      '2 x 2" Angle',
+      '3 x 3" Angle',
+      '2 x 2" Angle w/ 3 holes',
+      '2 x 2" Angle w/ 6 holes',
+      '2 x 2" Angle w/ 8 holes',
+      '1 x 1" Capri Clips',
+      '2" Internal Clips',
+      '3" Inserts w/ Flange',
+      '12\' Tie Down Cable w/ Triangle',
+      '14\' Tie Down Cable w/ Triangle',
+      '16\' Tie Down Cable w/ Triangle',
+      '18\' Tie Down Cable w/ Triangle'
+    ]
+  },
+  {
+    name: 'Screen',
+    items: [
+      'Spline',
+      '18/14 Screen',
+      '20/20 Screen',
+      'Regular TUFF Screen ',
+      'Solar Screen',
+      'NO-SEE-UM TUFF Screen',
+      'Pet Screen',
+      'Florida Glass',
+      '16" Kickplate Coil',
+      '24" Kickplate Coil',
+      '10" Fascia W/G, and Smooth',
+      'Breakform Fascia up to 12"',
+      'Spray Paint',
+      'Touch Up Paint',
+      'MFM 3" x 33.5\' Peel & Seal',
+      'Nova Flex',
+      'Vulkem Sealer',
+      'MFM 4" x 33.5\' Peel & Seal',
+      'Kickplate Trim'
+    ]
+  },
+  {
+    name: 'Gutter',
+    items: [
+      '6" K Gutter',
+      '7" K Gutter',
+      '5" Super Gutter',
+      '7" Super Gutter',
+      '6" Gutter Solution',
+      '3" Header',
+      '6" Diverter',
+      'Inside Box Miter',
+      'Outside Box Miter',
+      '6" Hanger',
+      '7" Hanger',
+      '6" End Cap',
+      '7" End Cap',
+      '5" Super Gutter End Cap',
+      '7" Super Gutter End Cap',
+      '6" Wedge',
+      '7" Wedge',
+      '3x4" Downspout',
+      '4x5" Downspout',
+      '3x4" Drop Out',
+      '4x5" Drop Out',
+      '3x4" A Elbow',
+      '4x5" A Elbow',
+      '3x4" B Elbow',
+      '4x5" B Elbow',
+      '3x4" Offset',
+      '4x5" Offset',
+      'Concrete Splash Block',
+      '4oz. Perma Sealer',
+      'Nova Flex',
+      'Vulkem Sealer'
+    ]
+  },
+  {
+    name: 'Door',
+    items: [
+      '36" x 80" screen door with standard handle',
+      '42" x 80" screen door with standard handle',
+      '72" x 80" double screen door with astragal and standard handle',
+      '36" x 80" Suntech seaview door with Tazman handles & Piano hinge',
+      '42" x 80" Suntech seaview door with Tazman handles & Piano hinge',
+      '72" x 80" Suntech double seaview door with Tazman handles & Piano hinge',
+      '42" x 96" Suntech seaview door with Tazman handles & Piano hinge',
+      'Astragal',
+      'Suntech Door Handle',
+      'Tazman Door Handle',
+      'Standard Z-Bar',
+      'Suntech Z-Bar',
+      'Standard Closer Kit',
+      'Suntech Closer Kit',
+      'Key Lock',
+      'Standard Hinge',
+      'Piano Hinge',
+      '36" Standard Bug Sweep',
+      '42" Standard Bug Sweep',
+      '36" Suntech Bug Sweep w/ Felt',
+      '42" Suntech Bug Sweep w/ Felt',
+      'Suntech Felt',
+      'Small Dog Door (4 3/4" x 7 1/2")',
+      'Medium Dog Door (8 1/2" x 12 1/2")',
+      'Large Dog Door (11 1/2" x 16 7/8")',
+      'X-Large Dog Door (14 1/2" x 19 1/2")'
+    ]
+  },
+  {
+    name: 'Miscellaneous',
+    items: []
+  }
+];
+const MATERIAL_JOB_FIELDS = [
+  ...QC_JOB_FIELDS.filter(field => ['firstName', 'lastName', 'streetAddress', 'city', 'state', 'jobNumberPhase'].includes(field.id))
+];
+
 const QC_INSPECTION_ITEMS = [
   { id: 'superGutterSeamsFastened', label: 'Super Gutter seams neatly fastened and leak free', options: ['', 'Yes', 'No'] },
   { id: 'doorsOperationalAndLock', label: 'Doors are operational and lock', options: ['', 'Yes', 'No'] },
@@ -278,6 +463,19 @@ const DOCUMENT_TYPES = {
       { key: 'general', title: 'General Section', pdfTitle: 'GENERAL SECTION', continuedTitle: 'General Section continued', items: QC_GENERAL_ITEMS },
       { key: 'inHouse', title: 'Inspection Results', pdfTitle: 'INSPECTION RESULTS', continuedTitle: 'Inspection Results continued', items: QC_INSPECTION_RESULT_ITEMS }
     ]
+  },
+  materialList: {
+    id: 'materialList',
+    label: 'Material List',
+    shortLabel: 'Material List',
+    title: 'Material List',
+    pdfTitle: 'MATERIAL LIST',
+    filenameLabel: 'MaterialList',
+    defaultFilename: 'MaterialList',
+    summaryPlaceholder: 'Enter material list notes...',
+    fields: MATERIAL_JOB_FIELDS,
+    displayedWording: {},
+    groups: []
   }
 };
 

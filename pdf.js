@@ -33,7 +33,7 @@ async function generatePacket() {
     writeCurrentJobSnapshot(currentJob);
     await loadDraftList();
 
-    const photos = await getCurrentPhotos();
+    const photos = currentJob.documentType === 'materialList' ? [] : await getCurrentPhotos();
     const bytes = await buildDocumentPacketPdf(currentJob, photos);
     const filename = packetFilename(currentJob);
     const blob = new Blob([bytes], { type: 'application/pdf' });
@@ -66,7 +66,7 @@ async function buildDocumentPacketPdf(job, photos) {
   job = normalizeJob(job);
   const doc = { pages: [], logo: await loadPdfLogo(), job };
   await addDocumentPages(doc, job);
-  await addPhotoPages(doc, job, photos);
+  if (job.documentType !== 'materialList') await addPhotoPages(doc, job, photos);
   doc.pages.forEach((page, index) => addPageNumber(page, index + 1, doc.pages.length));
   return buildPdf(doc);
 }
@@ -83,6 +83,12 @@ async function addDocumentPages(doc, job) {
     y = addJobInfo(page, job, y, jobFields);
   }
 
+  if (definition.id === 'materialList' && job.materialItems.some(item => item.product)) {
+    ({ page, y } = ensurePageSpace(doc, page, y + 6, 58));
+    y = sectionBar(page, 'MATERIAL ITEMS', y);
+    ({ page, y } = addMaterialItemsTable(doc, page, job.materialItems, y));
+  }
+
   for (const group of definition.groups) {
     const groupItems = filledItems(group.items, job[group.key]);
     if (groupItems.length) {
@@ -92,15 +98,57 @@ async function addDocumentPages(doc, job) {
     }
   }
 
-  if (hasPdfValue(job.summaryNotes)) {
+  if (definition.id !== 'materialList' && hasPdfValue(job.summaryNotes)) {
     ({ page, y } = ensurePageSpace(doc, page, y + 4, 78));
     y = sectionBar(page, 'SUMMARY NOTES', y);
     y = addSummaryBlock(page, job, y);
   }
 
-  ({ page, y } = ensurePageSpace(doc, page, y + 4, 104));
-  addSignatureBlock(page, job, y + 8);
+  if (definition.id !== 'materialList') {
+    ({ page, y } = ensurePageSpace(doc, page, y + 4, 104));
+    addSignatureBlock(page, job, y + 8);
+  }
   doc.pages.push(page);
+}
+
+/* Add product, color, and quantity rows to the Material List PDF. */
+function addMaterialItemsTable(doc, page, items, y) {
+  const x = MARGIN;
+  const width = PAGE_W - MARGIN * 2;
+  const columns = [x + 10, x + 100, x + 315, x + 410, x + 465];
+  const categoryWidth = 80;
+  const productWidth = 205;
+  const colorWidth = 90;
+  const drawHeader = () => {
+    rectFill(page, x, y, width, 22, PDF_COLORS.tealSoft);
+    text(page, 'Category', columns[0], y + 14, 8, 'F2', PDF_COLORS.plum);
+    text(page, 'Product', columns[1], y + 14, 8, 'F2', PDF_COLORS.plum);
+    text(page, 'Color', columns[2], y + 14, 8, 'F2', PDF_COLORS.plum);
+    text(page, 'Quantity', columns[3], y + 14, 8, 'F2', PDF_COLORS.plum);
+    text(page, 'Unit', columns[4], y + 14, 8, 'F2', PDF_COLORS.plum);
+    y += 22;
+  };
+  drawHeader();
+
+  for (const item of items.filter(row => row.product)) {
+    const categoryLines = wrappedLineCount(item.category || '', categoryWidth, 8.5, 'F1');
+    const productLines = wrappedLineCount(item.product || '', productWidth, 8.5, 'F1');
+    const colorLines = wrappedLineCount(item.color || '', colorWidth, 8.5, 'F1');
+    const h = Math.max(30, Math.max(productLines, categoryLines, colorLines) * 10 + 16);
+    const ensured = ensurePageSpace(doc, page, y, h);
+    page = ensured.page;
+    y = ensured.y;
+    if (ensured.newPage) drawHeader();
+    rectFill(page, x, y, width, h, PDF_COLORS.white);
+    rectStroke(page, x, y, width, h, PDF_COLORS.lightGray);
+    wrappedText(page, item.category || '', columns[0], y + 17, categoryWidth, 8.5, 10, 'F1');
+    wrappedText(page, item.product || '', columns[1], y + 17, productWidth, 8.5, 10, 'F1');
+    wrappedText(page, item.color || '', columns[2], y + 17, colorWidth, 8.5, 10, 'F1');
+    text(page, String(item.quantity || ''), columns[3], y + 17, 8.5, 'F1', PDF_COLORS.text);
+    text(page, String(item.unit || ''), columns[4], y + 17, 8.5, 'F1', PDF_COLORS.text);
+    y += h;
+  }
+  return { page, y: y + 4 };
 }
 
 /* Create an empty PDF page container */
@@ -134,7 +182,9 @@ function addHeader(page, title, job) {
     imageOnPage(page, page.logo, MARGIN, 22, logoFit.w, logoFit.h);
   }
 
-  const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT'] : ['PRE-CONSTRUCTION', 'CHECKLIST'];
+  const lines = title === 'ZERO DEFECT REPORT' ? ['ZERO DEFECT', 'REPORT']
+    : title === 'MATERIAL LIST' ? ['MATERIAL', 'LIST']
+    : ['PRE-CONSTRUCTION', 'CHECKLIST'];
   const titleX = 304;
   const titleW = HEADER_SAFE_RIGHT - titleX;
   fittedCenteredText(page, lines[0], titleX, titleW, 57, 26, 'F3', PDF_COLORS.plum);

@@ -80,7 +80,7 @@
 
         <div id="extraDocumentSections"></div>
 
-        <section class="card">
+        <section id="summarySection" class="card">
           <h2>Summary</h2>
           <label class="field full-field">
             <span>Summary Notes</span>
@@ -88,7 +88,7 @@
           </label>
         </section>
 
-        <section class="card">
+        <section id="photosSection" class="card">
           <div class="section-heading-row">
             <div>
               <h2>Photos</h2>
@@ -104,11 +104,12 @@
           <div id="photoGrid" class="photo-grid"></div>
         </section>
 
-        <section class="card bottom-actions-card">
-          <h2>Finish Checklist</h2>
+        <section id="finishSection" class="card bottom-actions-card">
+          <h2 id="finishSectionTitle">Finish Checklist</h2>
           <div class="bottom-actions">
             <button id="bottomSignedPdfBtn" type="button">Download PDF Packet</button>
             <button id="bottomSaveBtn" class="secondary" type="button">Save Draft</button>
+            <button id="createMaterialListBtn" class="secondary hidden" type="button">Create Material List</button>
           </div>
           <div id="bottomOutputStatus" class="status-box"></div>
         </section>

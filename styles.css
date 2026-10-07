@@ -331,11 +331,13 @@ button.full { width: 100%; margin-bottom: .75rem; }
 }
 
 .app-header .document-type-tabs {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: .3rem;
   border-color: var(--blue-2);
   background: var(--blue);
 }
+
+.document-actions { margin: 0 0 .9rem; }
 
 .document-type-tab {
   min-height: 52px;
@@ -439,6 +441,48 @@ button.full { width: 100%; margin-bottom: .75rem; }
 
 .field textarea { resize: vertical; }
 .full-field { grid-column: 1 / -1; }
+
+.material-list-card .section-heading-row { align-items: center; }
+.material-list-card h2 { margin: 0; }
+.material-search-field { margin: 1rem 0 .6rem; }
+.material-search-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: .35rem;
+  max-height: 280px;
+  overflow: auto;
+  margin: 0 0 .8rem;
+  padding: .35rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+.material-search-result {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .8rem;
+  padding: .65rem;
+  border: 1px solid transparent;
+  background: #fff;
+  color: var(--text);
+  box-shadow: none;
+  text-align: left;
+}
+.material-search-result:hover,
+.material-search-result:focus-visible { border-color: var(--teal); background: var(--teal-soft); }
+.material-search-result span { flex: 0 0 auto; color: var(--muted); font-size: .85rem; }
+.material-search-empty { grid-column: 1 / -1; margin: .5rem; color: var(--muted); }
+.material-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(210px, 1.8fr) minmax(130px, 1fr) minmax(90px, .6fr) minmax(90px, .6fr) auto;
+  align-items: end;
+  gap: .8rem;
+  padding: .9rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.material-row:last-child { border-bottom: 0; }
+.remove-material-item { min-height: 42px; }
 
 .item-card {
   display: grid;
@@ -635,7 +679,7 @@ button.full { width: 100%; margin-bottom: .75rem; }
 
 .bottom-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: .75rem;
   margin-bottom: 1rem;
 }
@@ -664,6 +708,9 @@ button.full { width: 100%; margin-bottom: .75rem; }
   .item-card { grid-template-columns: 1fr; }
   .item-title { padding-top: 0; }
   .grid.two { grid-template-columns: 1fr; }
+  .material-row { grid-template-columns: 1fr 1fr; }
+  .material-category-field,
+  .material-product-field { grid-column: 1 / -1; }
   .bottom-actions { grid-template-columns: 1fr; }
   .bottom-actions-card { margin-bottom: 5rem; }
 }

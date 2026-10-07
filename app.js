@@ -8,10 +8,10 @@
 
 const REQUIRED_ELEMENT_IDS = [
   'installBtn', 'newJobBtn', 'saveBtn', 'headerSignedPdfBtn', 'appLayout', 'savedDraftsPanel', 'jobList', 'currentJobTitle', 'dirtyPill',
-  'documentTypeTabs', 'jobInfoFields', 'inspectionSectionTitle', 'inspectionItems', 'inHouseSectionTitle', 'inHouseItems',
-  'extraDocumentSections', 'summaryNotes', 'addPhotosBtn', 'photoInput', 'photoGrid',
+  'documentTypeTabs', 'jobInfoFields', 'createMaterialListBtn', 'inspectionSectionTitle', 'inspectionItems', 'inHouseSectionTitle', 'inHouseItems',
+  'extraDocumentSections', 'summarySection', 'summaryNotes', 'photosSection', 'addPhotosBtn', 'photoInput', 'photoGrid',
   'refreshPhotosBtn', 'clearPhotosBtn',
-  'bottomSaveBtn', 'bottomSignedPdfBtn', 'bottomOutputStatus',
+  'finishSection', 'finishSectionTitle', 'bottomSaveBtn', 'bottomSignedPdfBtn', 'bottomOutputStatus',
   'checklistForm'
 ];
 
@@ -66,6 +66,7 @@ function blankJob() {
     fields: {},
     items: {},
     inHouse: {},
+    materialItems: [],
     summaryNotes: ''
   };
 }
@@ -113,6 +114,13 @@ function normalizeJob(job) {
   out.gutters = out.gutters || {};
   out.pergolaPan6 = out.pergolaPan6 || {};
   out.general = out.general || {};
+  out.materialItems = Array.isArray(out.materialItems) ? out.materialItems : [];
+  if (out.documentType === 'materialList' && out.fields.materialCategory) {
+    const legacyCategory = out.fields.materialCategory;
+    if (!out.materialItems.length) out.materialItems.push({ category: legacyCategory, product: '', color: '', quantity: '' });
+    else out.materialItems = out.materialItems.map(item => ({ ...item, category: item.category || legacyCategory }));
+    delete out.fields.materialCategory;
+  }
   out.summaryNotes = out.summaryNotes || '';
   // One Click Contractor owns the signature workflow. Remove legacy local-signature data
   // so older drafts cannot embed a captured signature in a newly generated packet.
@@ -150,12 +158,19 @@ function renderFormShell() {
   els.inspectionSectionTitle.textContent = doc.groups[0]?.title || 'Document Items';
   els.inHouseSectionTitle.textContent = doc.groups[1]?.title || 'Additional Items';
   els.summaryNotes.placeholder = doc.summaryPlaceholder || 'Enter summary notes...';
+  els.createMaterialListBtn.classList.toggle('hidden', doc.id !== 'qualityControl');
+  const isMaterialList = doc.id === 'materialList';
+  els.summarySection.classList.toggle('hidden', isMaterialList);
+  els.photosSection.classList.toggle('hidden', isMaterialList);
+  els.finishSectionTitle.textContent = isMaterialList ? 'Finish Document' : 'Finish Checklist';
   els.jobInfoFields.innerHTML = doc.fields.map(field => `
     <label class="field ${field.fullWidth ? 'full-field' : ''} ${field.additionalInstallCrew ? 'hidden' : ''}"${field.additionalInstallCrew ? ' data-additional-install-crew="true"' : ''}>
       <span>${escapeHtml(field.label)}</span>
       ${renderJobFieldControl(field)}
     </label>
   `).join('');
+  els.inspectionSectionTitle.closest('.card')?.classList.toggle('hidden', !doc.groups[0]);
+  els.inHouseSectionTitle.closest('.card')?.classList.toggle('hidden', !doc.groups[1]);
   els.inspectionItems.innerHTML = (doc.groups[0]?.items || []).map(item => renderChecklistItem(item, doc.groups[0].key)).join('');
   els.inHouseItems.innerHTML = (doc.groups[1]?.items || []).map(item => renderChecklistItem(item, doc.groups[1].key)).join('');
   els.extraDocumentSections.innerHTML = doc.groups.slice(2).map(group => `
@@ -163,7 +178,8 @@ function renderFormShell() {
       <h2>${escapeHtml(group.title)}</h2>
       <div>${group.items.map(item => renderChecklistItem(item, group.key)).join('')}</div>
     </section>
-  `).join('');
+  `).join('') + (doc.id === 'materialList' ? renderMaterialListSection() : '');
+  updateMaterialProductOptions();
 }
 
 /* Render a job-information text field or configured dropdown. */
@@ -174,6 +190,217 @@ function renderJobFieldControl(field) {
     </select>`;
   }
   return `<input id="field_${field.id}" data-kind="job-field" data-id="${field.id}" type="${field.type || 'text'}"${field.autocomplete ? ` autocomplete="${field.autocomplete}"` : ''}${field.inputMode ? ` inputmode="${field.inputMode}"` : ''}${field.maxLength ? ` maxlength="${field.maxLength}"` : ''}${field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : ''}>`;
+}
+
+/* Render the repeatable product, color, and quantity editor for Material List. */
+function renderMaterialListSection() {
+  const items = [...(currentJob.materialItems || [])];
+  if (!items.length || isMaterialItemComplete(items[items.length - 1])) items.push({});
+  return `
+    <section class="card material-list-card">
+      <h2>Material Items</h2>
+      <label class="field full-field material-search-field">
+        <span>Search products</span>
+        <input id="materialProductSearch" type="search" autocomplete="off" placeholder="Search all categories...">
+      </label>
+      <div id="materialProductSearchResults" class="material-search-results hidden" aria-live="polite"></div>
+      <div id="materialListItems">${items.map(renderMaterialItemRow).join('')}</div>
+    </section>
+  `;
+}
+
+/* Show matching products across every material category. */
+function renderMaterialSearchResults(query) {
+  const results = document.getElementById('materialProductSearchResults');
+  if (!results) return;
+  const searchQuery = String(query || '').trim();
+  if (!searchQuery) {
+    results.innerHTML = '';
+    results.classList.add('hidden');
+    return;
+  }
+
+  const matches = MATERIAL_GROUPS.flatMap(group => group.items
+    .filter(product => materialSearchMatches(`${group.name} ${product}`, searchQuery))
+    .map(product => ({ category: group.name, product })));
+  results.innerHTML = matches.length
+    ? matches.map(match => `<button class="material-search-result" type="button" data-category="${escapeHtml(match.category)}" data-product="${escapeHtml(match.product)}"><strong>${escapeHtml(match.product)}</strong><span>${escapeHtml(match.category)}</span></button>`).join('')
+    : '<p class="material-search-empty">No matching products.</p>';
+  results.classList.remove('hidden');
+}
+
+function normalizeMaterialSearchText(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function materialSearchMatches(value, query) {
+  const normalizedValue = normalizeMaterialSearchText(value);
+  const normalizedQuery = normalizeMaterialSearchText(query);
+  if (!normalizedQuery) return false;
+  if (normalizedValue.includes(normalizedQuery)) return true;
+
+  const queryWords = String(query).toLowerCase().match(/[a-z0-9]+/g) || [];
+  const valueWords = String(value).toLowerCase().match(/[a-z0-9]+/g) || [];
+  return queryWords.every(queryWord => {
+    const normalizedWord = normalizeMaterialSearchText(queryWord);
+    return valueWords.some(valueWord => {
+      const normalizedValueWord = normalizeMaterialSearchText(valueWord);
+      if (normalizedValueWord.includes(normalizedWord)) return true;
+      return normalizedWord.length >= 4 && fuzzyMaterialWordMatch(normalizedWord, normalizedValueWord);
+    });
+  });
+}
+
+function fuzzyMaterialWordMatch(queryWord, valueWord) {
+  const maxDistance = queryWord.length >= 8 ? 2 : 1;
+  if (Math.abs(queryWord.length - valueWord.length) > maxDistance) return false;
+
+  let previous = Array.from({ length: valueWord.length + 1 }, (_, index) => index);
+  for (let queryIndex = 1; queryIndex <= queryWord.length; queryIndex++) {
+    const current = [queryIndex];
+    let rowMinimum = queryIndex;
+    for (let valueIndex = 1; valueIndex <= valueWord.length; valueIndex++) {
+      const cost = queryWord[queryIndex - 1] === valueWord[valueIndex - 1] ? 0 : 1;
+      current[valueIndex] = Math.min(
+        current[valueIndex - 1] + 1,
+        previous[valueIndex] + 1,
+        previous[valueIndex - 1] + cost
+      );
+      rowMinimum = Math.min(rowMinimum, current[valueIndex]);
+    }
+    if (rowMinimum > maxDistance) return false;
+    previous = current;
+  }
+  return previous[valueWord.length] <= maxDistance;
+}
+
+/* Add a catalog search selection to the first row that has no product yet. */
+function selectMaterialSearchResult(category, product) {
+  const container = document.getElementById('materialListItems');
+  if (!container) return;
+  let row = Array.from(container.querySelectorAll('.material-row'))
+    .find(materialRow => !materialRow.querySelector('[data-material-field="product"]')?.value);
+  if (!row) {
+    container.insertAdjacentHTML('beforeend', renderMaterialItemRow());
+    row = container.lastElementChild;
+  }
+
+  const categorySelect = row.querySelector('[data-material-field="category"]');
+  categorySelect.value = category;
+  updateMaterialProductOptions(row);
+  row.querySelector('[data-material-field="product"]').value = product;
+  ensureTrailingMaterialRow();
+
+  const search = document.getElementById('materialProductSearch');
+  if (search) search.value = '';
+  renderMaterialSearchResults('');
+  markDraftChanged();
+}
+
+function isMaterialItemComplete(item) {
+  return Boolean(item.category && item.product);
+}
+
+function ensureTrailingMaterialRow() {
+  const container = document.getElementById('materialListItems');
+  if (!container) return;
+  const rows = Array.from(container.querySelectorAll('.material-row'));
+  const lastRow = rows[rows.length - 1];
+  if (!lastRow || !isMaterialItemComplete(readMaterialItemRow(lastRow))) return;
+  container.insertAdjacentHTML('beforeend', renderMaterialItemRow());
+  updateMaterialProductOptions(container.lastElementChild);
+}
+
+function readMaterialItemRow(row) {
+  return {
+    category: row.querySelector('[data-material-field="category"]')?.value || '',
+    product: row.querySelector('[data-material-field="product"]')?.value || '',
+    color: row.querySelector('[data-material-field="color"]')?.value || '',
+    quantity: row.querySelector('[data-material-field="quantity"]')?.value || '',
+    unit: row.querySelector('[data-material-field="unit"]')?.value || ''
+  };
+}
+
+/* Render one selectable material line. */
+function renderMaterialItemRow(item = {}) {
+  return `
+    <div class="material-row" data-material-category="${escapeHtml(item.category || '')}">
+      <label class="field material-category-field">
+        <span>Category</span>
+        <select data-material-field="category">
+          <option value="">Select category...</option>
+          ${MATERIAL_GROUPS.map(group => `<option value="${escapeHtml(group.name)}"${item.category === group.name ? ' selected' : ''}>${escapeHtml(group.name)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field material-product-field">
+        <span>Product</span>
+        ${renderMaterialProductControl(item.category, item.product)}
+      </label>
+      <label class="field">
+        <span>Color</span>
+        <select data-material-field="color">
+          <option value="">Select color...</option>
+          ${['Bronze', 'White', 'Translucent'].map(color => `<option value="${color}"${item.color === color ? ' selected' : ''}>${color}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field material-quantity-field">
+        <span>Quantity</span>
+        <input data-material-field="quantity" type="number" min="1" step="1" value="${escapeHtml(item.quantity || '')}">
+      </label>
+      <label class="field material-unit-field">
+        <span>Unit</span>
+        <select data-material-field="unit">
+          <option value="">Select...</option>
+          ${['lft', 'in.', 'ea'].map(unit => `<option value="${unit}"${item.unit === unit ? ' selected' : ''}>${unit}</option>`).join('')}
+        </select>
+      </label>
+      <button class="danger subtle remove-material-item" type="button" aria-label="Remove material item">Remove</button>
+    </div>
+  `;
+}
+
+function renderMaterialProductControl(category, product = '') {
+  if (category === 'Miscellaneous') {
+    return `<input data-material-field="product" type="text" placeholder="Enter product..." value="${escapeHtml(product)}">`;
+  }
+  const products = getMaterialGroup(category)?.items || [];
+  return `<select data-material-field="product"${products.length ? '' : ' disabled'}>
+    <option value="">Select product...</option>
+    ${products.map(option => `<option value="${escapeHtml(option)}"${product === option ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+  </select>`;
+}
+
+function getMaterialGroup(category) {
+  return MATERIAL_GROUPS.find(group => group.name === category) || null;
+}
+
+/* Restrict one material row's product choices to its selected category. */
+function updateMaterialProductOptions(row = null) {
+  const rows = row ? [row] : Array.from(document.querySelectorAll('.material-row'));
+  rows.forEach(materialRow => {
+    const category = materialRow.querySelector('[data-material-field="category"]')?.value;
+    const products = getMaterialGroup(category)?.items || [];
+    const productControl = materialRow.querySelector('[data-material-field="product"]');
+    if (!productControl) return;
+    const previousCategory = materialRow.dataset.materialCategory || '';
+    const previousProduct = productControl.value;
+    const product = previousCategory === category
+      ? category === 'Miscellaneous' || products.includes(previousProduct) ? previousProduct : ''
+      : '';
+    productControl.outerHTML = renderMaterialProductControl(category, product);
+    materialRow.dataset.materialCategory = category || '';
+  });
+}
+
+/* Read visible material rows into the saved job shape. */
+function collectMaterialItems() {
+  return Array.from(document.querySelectorAll('.material-row')).map(row => ({
+    category: row.querySelector('[data-material-field="category"]')?.value || '',
+    product: row.querySelector('[data-material-field="product"]')?.value || '',
+    color: row.querySelector('[data-material-field="color"]')?.value.trim() || '',
+    quantity: row.querySelector('[data-material-field="quantity"]')?.value || '',
+    unit: row.querySelector('[data-material-field="unit"]')?.value || ''
+  })).filter(item => item.category || item.product || item.color || item.quantity || item.unit);
 }
 
 /* Render a single checklist item card */
@@ -269,6 +496,21 @@ function bindEvents() {
     markDirty(false);
   });
 
+  bindAsyncClick(els.createMaterialListBtn, createMaterialListFromQualityControl, 'Material List creation failed');
+
+  els.checklistForm.addEventListener('click', event => {
+    const searchResult = event.target?.closest('.material-search-result');
+    if (searchResult) {
+      selectMaterialSearchResult(searchResult.dataset.category, searchResult.dataset.product);
+      return;
+    }
+    if (event.target?.closest('.remove-material-item')) {
+      event.target.closest('.material-row')?.remove();
+      ensureTrailingMaterialRow();
+      markDraftChanged();
+    }
+  });
+
   els.documentTypeTabs.addEventListener('click', async event => {
     const tab = event.target.closest('[data-document-type]');
     if (!tab) return;
@@ -320,9 +562,18 @@ function bindEvents() {
   });
 
   bindAsyncClick(els.saveBtn, saveCurrentDraft, 'Save failed');
-  els.checklistForm.addEventListener('input', markDraftChanged);
+  els.checklistForm.addEventListener('input', event => {
+    if (event.target?.id === 'materialProductSearch') {
+      renderMaterialSearchResults(event.target.value);
+      return;
+    }
+    if (event.target?.closest('.material-row')) ensureTrailingMaterialRow();
+    markDraftChanged();
+  });
   els.checklistForm.addEventListener('change', event => {
     if (event.target?.matches('[data-kind="job-field"]')) updateAdditionalInstallCrewFields();
+    if (event.target?.dataset.materialField === 'category') updateMaterialProductOptions(event.target.closest('.material-row'));
+    if (event.target?.closest('.material-row')) ensureTrailingMaterialRow();
     markDraftChanged();
   });
 
@@ -361,6 +612,33 @@ function bindEvents() {
   els.headerSignedPdfBtn.addEventListener('click', generatePacket);
   bindAsyncClick(els.bottomSaveBtn, saveCurrentDraft, 'Save failed');
   els.bottomSignedPdfBtn.addEventListener('click', generatePacket);
+}
+
+/* Save the QC draft and create a separate Material List draft with shared job details. */
+async function createMaterialListFromQualityControl() {
+  if (activeDocument().id !== 'qualityControl') return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  if (autoSaveInFlight) await autoSaveInFlight;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  autoSaveQueued = false;
+  const qualityControlJob = collectJobFromForm();
+  await putStore('jobs', qualityControlJob);
+
+  const materialJob = blankJob();
+  materialJob.documentType = 'materialList';
+  ['firstName', 'lastName', 'streetAddress', 'city', 'state', 'jobNumberPhase'].forEach(id => {
+    materialJob.fields[id] = qualityControlJob.fields[id] || '';
+  });
+  materialJob.fields.address = formatAddress(materialJob.fields);
+  currentJob = materialJob;
+  await putStore('jobs', currentJob);
+  await loadDraftList();
+  await renderPhotos();
+  hydrateForm(currentJob);
+  els.currentJobTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setStatus('Created and opened a Material List draft from Quality Control.');
 }
 
 /* Change packet types while retaining shared customer and job details. */
@@ -425,6 +703,7 @@ function collectJobFromForm(documentTypeOverride = null) {
   doc.fields.forEach(field => {
     job.fields[field.id] = jobFieldValueForSave(field);
   });
+  job.materialItems = doc.id === 'materialList' ? collectMaterialItems() : [];
   job.fields.state = (job.fields.state || '').toUpperCase();
   job.fields.address = formatAddress(job.fields);
   doc.groups.forEach(group => {
@@ -575,6 +854,7 @@ function jobContentScore(job) {
   let score = 0;
   doc.fields.forEach(field => { if (hasPlainValue(job.fields?.[field.id])) score++; });
   if (hasPlainValue(job.summaryNotes)) score++;
+  score += job.materialItems.filter(item => item.category || item.product || item.color || item.quantity).length;
   doc.groups.forEach(group => group.items.forEach(item => {
     const row = job[group.key]?.[item.id] || {};
     if (hasPlainValue(item.options ? row.selection : row.value)) score++;
@@ -634,6 +914,14 @@ function hydrateForm(job) {
     const el = document.getElementById(`field_${field.id}`);
     if (el) el.value = currentJob.fields?.[field.id] || field.defaultValue || '';
   });
+  if (doc.id === 'materialList') {
+    updateMaterialProductOptions();
+    document.querySelectorAll('#materialListItems .material-row').forEach((row, index) => {
+      const item = currentJob.materialItems[index] || {};
+      const product = row.querySelector('[data-material-field="product"]');
+      if (product) product.value = item.product || '';
+    });
+  }
   doc.groups.forEach(group => hydrateItemGroup(group.key, group.items, currentJob[group.key] || {}));
   els.summaryNotes.value = currentJob.summaryNotes || '';
   els.currentJobTitle.textContent = draftTitle(currentJob, 'New Document');
