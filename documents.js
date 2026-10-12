@@ -180,6 +180,7 @@ const MATERIAL_GROUPS = [
       '3/8 x 3" Bolt SS LTD',
       '3/8 x 5" Bolt SS LTD',
       '3/8 x 7" Bolt SS LTD',
+      '3/8 x 9" Bolt SS LTD',
       '3" Self Tapper SS',
       '8 x 1/2" SS',
       '10 x 1" SS',
@@ -205,7 +206,8 @@ const MATERIAL_GROUPS = [
       'EZ Cleans',
       'Cap',
       'Washer',
-      'Shank'
+      'Shank',
+      'Hexcap'
     ]
   },
   {
