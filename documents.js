@@ -349,6 +349,26 @@ const MATERIAL_GROUPS = [
     items: []
   }
 ];
+
+const MATERIAL_COLOR_OPTIONS = ['Bronze', 'White', 'Translucent'];
+const SCREEN_MATERIAL_SIZES = {
+  '18/14 screen': ['72"', '84"', '96"', '108"'],
+  '20/20 screen': ['72"', '84"', '96"', '108"'],
+  'regular tuff screen': ['72"', '84"', '96"', '108"', '120"', '132"', '144"'],
+  'solar screen': ['84"'],
+  'no-see-um tuff screen': ['72"', '84"', '96"', '108"', '120"', '132"', '144"'],
+  'pet screen': ['48"'],
+  'florida glass': ['36"', '72"']
+};
+
+function getMaterialAttribute(category, product) {
+  const productKey = String(product || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const sizes = category === 'Screen' ? SCREEN_MATERIAL_SIZES[productKey] : null;
+  return sizes
+    ? { label: 'Size', options: sizes }
+    : { label: 'Color', options: MATERIAL_COLOR_OPTIONS };
+}
+
 const MATERIAL_JOB_FIELDS = [
   ...QC_JOB_FIELDS.filter(field => ['firstName', 'lastName', 'streetAddress', 'city', 'state', 'jobNumberPhase'].includes(field.id))
 ];

@@ -111,7 +111,7 @@ async function addDocumentPages(doc, job) {
   doc.pages.push(page);
 }
 
-/* Add product, color, and quantity rows to the Material List PDF. */
+/* Add product, color/size, and quantity rows to the Material List PDF. */
 function addMaterialItemsTable(doc, page, items, y) {
   const x = MARGIN;
   const width = PAGE_W - MARGIN * 2;
@@ -119,11 +119,15 @@ function addMaterialItemsTable(doc, page, items, y) {
   const categoryWidth = 80;
   const productWidth = 205;
   const colorWidth = 90;
+  const attributeLabels = new Set(items
+    .filter(item => item.product)
+    .map(item => getMaterialAttribute(item.category, item.product).label));
+  const attributeLabel = attributeLabels.size === 1 ? Array.from(attributeLabels)[0] : 'Color / Size';
   const drawHeader = () => {
     rectFill(page, x, y, width, 22, PDF_COLORS.tealSoft);
     text(page, 'Category', columns[0], y + 14, 8, 'F2', PDF_COLORS.plum);
     text(page, 'Product', columns[1], y + 14, 8, 'F2', PDF_COLORS.plum);
-    text(page, 'Color', columns[2], y + 14, 8, 'F2', PDF_COLORS.plum);
+    text(page, attributeLabel, columns[2], y + 14, 8, 'F2', PDF_COLORS.plum);
     text(page, 'Quantity', columns[3], y + 14, 8, 'F2', PDF_COLORS.plum);
     text(page, 'Unit', columns[4], y + 14, 8, 'F2', PDF_COLORS.plum);
     y += 22;

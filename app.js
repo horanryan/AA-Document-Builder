@@ -289,6 +289,7 @@ function selectMaterialSearchResult(category, product) {
   categorySelect.value = category;
   updateMaterialProductOptions(row);
   row.querySelector('[data-material-field="product"]').value = product;
+  updateMaterialAttributeControl(row);
   ensureTrailingMaterialRow();
 
   const search = document.getElementById('materialProductSearch');
@@ -336,13 +337,7 @@ function renderMaterialItemRow(item = {}) {
         <span>Product</span>
         ${renderMaterialProductControl(item.category, item.product)}
       </label>
-      <label class="field">
-        <span>Color</span>
-        <select data-material-field="color">
-          <option value="">Select color...</option>
-          ${['Bronze', 'White', 'Translucent'].map(color => `<option value="${color}"${item.color === color ? ' selected' : ''}>${color}</option>`).join('')}
-        </select>
-      </label>
+      ${renderMaterialAttributeControl(item.category, item.product, item.color)}
       <label class="field material-quantity-field">
         <span>Quantity</span>
         <input data-material-field="quantity" type="number" min="1" step="1" value="${escapeHtml(item.quantity || '')}">
@@ -356,6 +351,20 @@ function renderMaterialItemRow(item = {}) {
       </label>
       <button class="danger subtle remove-material-item" type="button" aria-label="Remove material item">Remove</button>
     </div>
+  `;
+}
+
+function renderMaterialAttributeControl(category, product, value = '') {
+  const attribute = getMaterialAttribute(category, product);
+  const placeholder = attribute.label === 'Size' ? 'Select size...' : 'Select color...';
+  return `
+    <label class="field material-attribute-field">
+      <span>${attribute.label}</span>
+      <select data-material-field="color">
+        <option value="">${placeholder}</option>
+        ${attribute.options.map(option => `<option value="${escapeHtml(option)}"${value === option ? ' selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+      </select>
+    </label>
   `;
 }
 
@@ -389,7 +398,18 @@ function updateMaterialProductOptions(row = null) {
       : '';
     productControl.outerHTML = renderMaterialProductControl(category, product);
     materialRow.dataset.materialCategory = category || '';
+    updateMaterialAttributeControl(materialRow);
   });
+}
+
+function updateMaterialAttributeControl(row) {
+  const control = row.querySelector('[data-material-field="color"]');
+  if (!control) return;
+  const category = row.querySelector('[data-material-field="category"]')?.value || '';
+  const product = row.querySelector('[data-material-field="product"]')?.value || '';
+  const attribute = getMaterialAttribute(category, product);
+  const value = attribute.options.includes(control.value) ? control.value : '';
+  control.closest('label').outerHTML = renderMaterialAttributeControl(category, product, value);
 }
 
 /* Read visible material rows into the saved job shape. */
@@ -573,6 +593,7 @@ function bindEvents() {
   els.checklistForm.addEventListener('change', event => {
     if (event.target?.matches('[data-kind="job-field"]')) updateAdditionalInstallCrewFields();
     if (event.target?.dataset.materialField === 'category') updateMaterialProductOptions(event.target.closest('.material-row'));
+    if (event.target?.dataset.materialField === 'product') updateMaterialAttributeControl(event.target.closest('.material-row'));
     if (event.target?.closest('.material-row')) ensureTrailingMaterialRow();
     markDraftChanged();
   });
